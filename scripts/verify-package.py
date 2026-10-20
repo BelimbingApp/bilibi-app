@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Prove packaging determinism by repackaging the same checked program."""
-import os
 from pathlib import Path
 import subprocess
 import sys
