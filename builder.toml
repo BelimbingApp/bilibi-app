@@ -1,0 +1,9 @@
+format = 1
+runner = "ubuntu-24.04"
+rust_image = "rust:1.99.0-bookworm@sha256:114c7a4425406451c2866b6aafe69fe29b1b298832db1277d411ac73c82d04d6"
+node_image = "node:24.6.0-bookworm-slim@sha256:9b741b28148b0195d62fa456ed84dd6c953c1f17a3761f3e6e6797a754d9edff"
+postgres_image = "postgres:18.0-bookworm@sha256:3f55f8895c4ed50603e2fbdfc72fffeeaba3173321fee5cb825bbbeb30d9d854"
+debian_snapshot = "20261007T000000Z"
+rust = "1.99.0"
+node = "24.6.0"
+target = "x86_64-unknown-linux-gnu"
