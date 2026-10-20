@@ -62,6 +62,13 @@ The setup version belongs to your repository. It is separate from the Platform a
 
 **Release setup** repeats the combined gates, checks the compiled program's reported composition, packages it, and creates a draft release. Only the draft job has `contents: write`. It uploads every asset and compares each digest with GitHub's recorded SHA-256. A rerun refuses an existing release instead of replacing its files.
 
+Final publication also needs an authenticated GitHub CLI session and Node.js 20 or newer on your machine. Install the locked `gh-axi` helper:
+
+```sh
+npm ci --prefix scripts/github-tools --ignore-scripts --no-audit --no-fund
+export PATH="$PWD/scripts/github-tools/node_modules/.bin:$PATH"
+```
+
 The owner publishes the verified draft as a separate final action. This keeps an administration credential out of Actions: checking GitHub's immutability setting requires administration read permission. Use your own authenticated `gh-axi` session, with that permission and permission to publish releases. In a clean checkout of the tagged commit, download all draft assets into an empty `dist/` folder:
 
 ```sh
