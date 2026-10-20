@@ -64,9 +64,6 @@ jobs:
         run: |
           mkdir -p build/evidence
           /usr/bin/time -p scripts/builder.sh scripts/check.sh 2> >(tee build/evidence/check-time.txt >&2)
-      - name: Measure a warm locked build
-        run: |
-          /usr/bin/time -p scripts/builder.sh bash -c 'cd build/platform; cargo build --workspace --release --target x86_64-unknown-linux-gnu --locked' 2> >(tee build/evidence/warm-time.txt >&2)
       - name: Package checked bytes
         if: inputs.release_tag != ''
         env:

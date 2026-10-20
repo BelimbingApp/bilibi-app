@@ -117,7 +117,7 @@ Only Linux x86-64 (`x86_64-unknown-linux-gnu`) is supported by this template tod
 
 The Debian 12 builder records its glibc version and the binary's dynamic dependencies in the recipe. This is a build baseline, not a claim that every Debian or Ubuntu release has been tested. Check the actual target server's libraries before promotion. Distributed programs do not use `target-cpu=native`.
 
-Archives have sorted entries, fixed modes, zero ownership, recipe-commit timestamps and no gzip timestamp. The workflow repackages the same program and compares every asset digest. This proves deterministic packaging. **The program is built from the recorded recipe; two clean compiler builds have not yet proved identical output bytes.** Build logs record the checked run and a warm locked build separately. Cache keys include the source map, composition, toolchain and builder; cache hits still run every check.
+Archives have sorted entries, fixed modes, zero ownership, recipe-commit timestamps and no gzip timestamp. The workflow repackages the same program and compares every asset digest. This proves deterministic packaging. **The program is built from the recorded recipe; two clean compiler builds have not yet proved identical output bytes.** The workflow records the checked run time; compare a cold run with a later run that restores the cache. Cache keys include the source map, composition, toolchain and builder; cache hits still run every check.
 
 ## Where to go next
 
