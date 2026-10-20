@@ -124,7 +124,9 @@ def restore():
     target = PLATFORM / '.local/composition'
     target.mkdir(parents=True, exist_ok=True)
     for name in ('manifest.txt', 'Cargo.lock'):
-        shutil.copyfile(ROOT / 'composition' / name, target / name)
+        source = ROOT / 'composition' / name
+        if not (target / name).exists() or source.read_bytes() != (target / name).read_bytes():
+            shutil.copyfile(source, target / name)
     run('python3', 'scripts/discover-modules.py', '--restore')
     run('python3', 'scripts/discover-modules.py', '--check')
     # Compare all saved version tags with the tags actually fetched.
