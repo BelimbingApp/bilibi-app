@@ -25,6 +25,21 @@ def api(path):
     raise ValueError(f'No JSON response from gh-axi: {result}')
 
 
+def find_release(repository, tag):
+    # The by-tag endpoint hides drafts, so read the authenticated release list.
+    matches = []
+    page = 1
+    while True:
+        batch = api(f'/repos/{repository}/releases?per_page=100&page={page}')
+        matches += [release for release in batch if release['tag_name'] == tag]
+        if len(batch) < 100:
+            break
+        page += 1
+    if len(matches) != 1:
+        raise ValueError(f'Expected exactly one GitHub release for {tag}, found {len(matches)}')
+    return matches[0]
+
+
 def checksum(path):
     with path.open('rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
@@ -88,9 +103,7 @@ def main():
                  f'Built from {commit}. Verify SHA256SUMS and recipe.json. Install the bilibi-setup archive through Software upload. '
                  'The installer and server tools are separate bootstrap assets. Checksums are not signatures.',
                  *map(str, sorted((ROOT / 'dist').iterdir()))))
-    release = api(f'/repos/{args.repository}/releases/tags/{args.tag}')
-    if release['tag_name'] != args.tag:
-        raise ValueError('GitHub returned a release for another tag')
+    release = find_release(args.repository, args.tag)
     if not release['draft']:
         raise ValueError('This release is already published; never replace its tag or assets')
     verify_assets(release, expected)
@@ -101,7 +114,7 @@ def main():
         if not api(f'/repos/{args.repository}/immutable-releases')['enabled']:
             raise ValueError('Enable release immutability in repository Settings before publishing')
         print(gh('release', 'edit', args.tag, '--repo', args.repository, '--draft=false'))
-        published = api(f'/repos/{args.repository}/releases/tags/{args.tag}')
+        published = find_release(args.repository, args.tag)
         if published['draft'] or not published.get('immutable'):
             raise ValueError('GitHub did not report an immutable published release')
         verify_assets(published, expected)
