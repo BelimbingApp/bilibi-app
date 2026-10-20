@@ -97,6 +97,7 @@ def materialize():
         if not folder.exists():
             # --no-checkout avoids executing any source before the selected commit.
             run('git', 'clone', '--no-checkout', '--', source['url'], str(folder), cwd=BUILD)
+            run('git', 'fetch', '--tags', 'origin', source['commit'], cwd=folder)
             run('git', 'checkout', '--detach', source['commit'], cwd=folder)
         # Fetch tags even for a previously materialized checkout. Pin/restore also
         # compares version labels, so a changed version tag cannot silently drift.
