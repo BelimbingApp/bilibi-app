@@ -17,13 +17,9 @@ import base64, json, os, sys
 path = sys.argv[2]
 releases = json.load(open(os.environ['FAKE_RELEASES']))
 if '/releases/tags/' in path:
-    tag = path.rsplit('/', 1)[1]
-    body = next((r for r in releases if r['tag_name'] == tag and not r['draft']), None)
-    if body is None:
-        sys.exit(1)
-else:
-    page = int(path.split('&page=')[1])
-    body = releases[(page - 1) * 100:page * 100]
+    sys.exit(1)
+page = int(path.split('&page=')[1])
+body = releases[(page - 1) * 100:page * 100]
 print('  body: "' + base64.b64encode(json.dumps(body).encode()).decode() + '"')
 '''
 
@@ -45,10 +41,8 @@ class FindReleaseTest(unittest.TestCase):
     def write(self, releases):
         self.releases.write_text(json.dumps(releases))
 
-    def test_finds_draft_that_the_by_tag_endpoint_hides(self):
+    def test_finds_a_draft_release(self):
         self.write([{'tag_name': 'setup-v1.0.0', 'draft': True, 'assets': []}])
-        with self.assertRaises(Exception):
-            publish.api('/repos/o/r/releases/tags/setup-v1.0.0')
         self.assertTrue(publish.find_release('o/r', 'setup-v1.0.0')['draft'])
 
     def test_finds_release_beyond_the_first_page(self):
