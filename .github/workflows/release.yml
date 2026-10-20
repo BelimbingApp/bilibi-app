@@ -1,0 +1,44 @@
+name: Release setup
+on:
+  push:
+    tags: ['setup-v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    uses: ./.github/workflows/check.yml
+    with:
+      release_tag: ${{ github.ref_name }}
+    secrets:
+      SOURCE_READ_TOKEN: ${{ secrets.SOURCE_READ_TOKEN }}
+  draft:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.6.0'
+      - run: npm ci --prefix scripts/github-tools --no-audit --no-fund --ignore-scripts
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: setup-release
+          path: dist
+      - name: Create draft and verify every GitHub asset digest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          export PATH="$PWD/scripts/github-tools/node_modules/.bin:$PATH"
+          python3 scripts/publish.py draft --tag "$RELEASE_TAG" --repository "$GITHUB_REPOSITORY"
+      # Publishing is an owner action: publish.py publish verifies the repository
+      # immutability setting, which requires Administration:read. The build and
+      # draft jobs deliberately have no administration credential.

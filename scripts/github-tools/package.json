@@ -1,0 +1,6 @@
+{
+  "name": "bilibi-setup-github-tools",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {"gh-axi": "0.1.35"}
+}
