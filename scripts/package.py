@@ -85,6 +85,8 @@ def main():
     import hashlib
     sums = ''.join(f'{hashlib.sha256(data).hexdigest()}  {name}\n' for name, (data, _) in sorted(contents.items()))
     contents['SHA256SUMS'] = (sums.encode(), 0o644)
+    if sum(len(data) for data, _ in contents.values()) > 1024 * 1024 * 1024:
+        raise ValueError('Payload exceeds the existing Bilibi unpack limit of 1 GiB')
     output = recipe.ROOT / 'dist'
     if output.exists() and any(output.iterdir()):
         raise ValueError('dist must be empty; move the previous release aside first')
