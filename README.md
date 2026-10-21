@@ -62,12 +62,23 @@ The Platform keeps its existing runtime locations: `.local/dev` contains develop
 | `./bilibi start` | Obtain missing sources, prepare prerequisites and start local development with the development seed. |
 | `./bilibi setup` | Prepare missing sources, safeguards and prerequisites; preserve existing branches, staged files, edits and untracked files. |
 | `./bilibi add finance` | Install the Platform safeguard, then mount an official Domain or Extension from its catalogue. Existing destinations are preserved. |
+| `./bilibi add <id> --kind <domains\|extensions> --source <repository> --commit <commit>` | Mount the official repository at the exact commit shown by Software, even when the local catalogue does not list it. |
 | `./bilibi status` | Show application and component Git roots, branches, changes and saved-version differences. |
 | `./bilibi pin` | Record committed component selections and resolved dependencies after validating a disposable candidate. |
 | `./bilibi check` | Validate the saved commits and lock, format, lint, build, migrate, seed and boot against a separate empty database. |
 | `./bilibi build` | Use the pinned builder to compile and verify the saved release composition with `--locked`. |
 
 `./bilibi new` belongs to the Platform repository. In an application repository, you already own the application recipe.
+
+Copy the install command from **Administration › System › Software** and run it from your application root:
+
+```sh
+./bilibi add finance --kind domains --source https://github.com/BelimbingApp/bilibi-dom-finance --commit <recommended-commit>
+```
+
+Give all three flags together. The commit must be a full lowercase 40-character ID. Finance mounts at `sources/platform/apps/domains/finance`; Extensions mount at `sources/platform/apps/extensions/<id>`. Without these flags, `add` uses the local Platform catalogue and the repository's default branch, as before.
+
+An existing checkout at the requested commit keeps its branch and edits. If it is at another commit, `add` refuses and prints the requested commit and fetch/checkout steps. Save your work before following those steps. A different origin, occupied path or mismatched component descriptor also causes a refusal. If a new clone lacks the requested commit, it stays available for inspection and the message explains how to retry. Run `./bilibi start` to try the component, then commit and push your component work before `./bilibi pin` saves the selection.
 
 Repeated setup does not fetch existing clones, so an unavailable remote cannot discard or block work already present. It never resets, cleans, switches or removes an existing checkout. A saved-version mismatch prints the path and next action. Strict checks and release builds instead require the saved commits and clean sources, except for recognised generated composition files.
 
