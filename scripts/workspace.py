@@ -150,7 +150,7 @@ def add_explicit(component, kind, source, commit):
                              'nothing was changed')
         print(f'Keeping existing checkout, branch and edits: {folder}', flush=True)
     else:
-        run('git', 'clone', '--', source, folder)
+        run('git', 'clone', '--', source.removesuffix('.git') + '.git', folder)
         try:
             run('git', 'checkout', '--detach', commit, cwd=folder)
         except subprocess.CalledProcessError:

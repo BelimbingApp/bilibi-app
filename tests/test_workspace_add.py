@@ -16,6 +16,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'scripts'))
 import workspace
 
+OFFICIAL = workspace.OFFICIAL
+
 
 class AddTest(unittest.TestCase):
     def setUp(self):
@@ -67,7 +69,7 @@ class AddTest(unittest.TestCase):
             patcher = mock.patch.object(target, attribute, value)
             patcher.start()
             self.addCleanup(patcher.stop)
-        original_recipe = workspace.recipe.recipe
+        original_recipe = self.original_recipe = workspace.recipe.recipe
         patcher = mock.patch.object(workspace.recipe, 'recipe', lambda: original_recipe(self.app))
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -162,6 +164,26 @@ class AddTest(unittest.TestCase):
         head = self.git(self.remote, 'rev-parse', 'HEAD')
         self.add('--kind', 'extensions', '--source', self.source, '--commit', head)
         self.assertEqual(self.git(self.platform / 'apps/extensions/finance', 'rev-parse', 'HEAD'), head)
+
+    def test_source_without_git_suffix_is_savable(self):
+        source = 'https://github.com/BelimbingApp/finance'
+        get_url = workspace.run
+        def raw_origin(*args, **kwargs):
+            if args[:3] == ('git', 'remote', 'get-url'):
+                args = ('git', 'config', '--get', f'remote.{args[3]}.url')
+            return get_url(*args, **kwargs)
+        rewrite = {'GIT_CONFIG_COUNT': '1', 'GIT_CONFIG_KEY_0': f'url.{self.source}.insteadOf',
+                   'GIT_CONFIG_VALUE_0': source + '.git'}
+        with (mock.patch.object(workspace, 'OFFICIAL', OFFICIAL), mock.patch.object(workspace, 'run', raw_origin),
+              mock.patch.dict(os.environ, rewrite)):
+            self.add('--kind', 'domains', '--source', source, '--commit', self.first)
+            self.assertEqual(self.git(self.folder, 'config', '--get', 'remote.origin.url'), source + '.git')
+            (self.platform / '.git/info/exclude').write_text('/apps/domains/\n')
+            pinned = self.app / 'pinned'
+            pinned.mkdir()
+            (pinned / 'setup.toml').write_text(workspace.serialize(workspace.selected_recipe()))
+            _, sources = self.original_recipe(pinned)
+        self.assertIn(('apps/domains/finance', {'id': 'finance', 'url': source + '.git', 'commit': self.first}), sources)
 
 
 if __name__ == '__main__':
