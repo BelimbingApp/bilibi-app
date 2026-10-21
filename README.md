@@ -1,6 +1,6 @@
 # Bilibi application starting point
 
-This repository is what `./bilibi new <name>` copies when you keep an application of your own.
+[bilibi-app](https://github.com/BelimbingApp/bilibi-app) is what `./bilibi new <name>` copies when you keep an application of your own.
 
 **New to Bilibi? Start in [bilibi](https://github.com/BelimbingApp/bilibi):**
 
@@ -162,6 +162,8 @@ python3 scripts/publish.py publish --tag setup-v1.0.0 --repository YOUR-ORGANISA
 The script checks the tagged commit, local checksums, GitHub asset digests and repository immutability before publishing. It then requires GitHub to report an immutable release. A `setup-vX.Y.Z-test` tag runs the same build but must stay a draft; delete the draft and tag after testing.
 
 ## Install a release
+
+Set the Software page's **GitHub repository** setting to your own application repository, for example `your-company/my-bilibi`. The server reads its releases from that repository.
 
 Download the `bilibi-setup-v1.0.0-x86_64-unknown-linux-gnu.tar.gz` asset from your own repository. Download `SHA256SUMS` too and verify the archive against GitHub's recorded asset digest or [release verification](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/verify-release-integrity).
 
