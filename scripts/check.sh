@@ -20,7 +20,7 @@ def identity(value):
 
 def connected_identity(value):
     result = subprocess.run(['psql', value, '-X', '-v', 'ON_ERROR_STOP=1', '-Atqc',
-                             "SELECT current_database(), pg_postmaster_start_time()"],
+                             "SELECT current_database(), extract(epoch from pg_postmaster_start_time())"],
                             capture_output=True, text=True, env={**os.environ, 'PGCONNECT_TIMEOUT': '5'})
     return result.stdout.strip() if result.returncode == 0 else None
 
