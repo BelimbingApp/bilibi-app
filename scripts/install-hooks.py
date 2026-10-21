@@ -2,16 +2,29 @@
 """Install repository-local, repeatable guards, chaining an existing pre-commit."""
 import os
 from pathlib import Path
-import re
 import shlex
 import subprocess
 import tempfile
 
 MARKER = '# Bilibi repository guard v2'
-LEGACY_GUARD = re.compile(
-    r'#!/usr/bin/env bash\n# Bilibi repository guard v1\nset -euo pipefail\ncd -- .+\n'
-    r'if \[\[ -x .+/pre-commit\.before-bilibi\S* \]\]; then .+ "\$@"; fi\n'
-    r'exec python3 .+/scripts/(?:discover-modules\.py --check|workspace\.py check-staged)\n')
+
+
+def legacy_guard(current, command):
+    lines = current.split('\n')
+    if len(lines) != 7 or not lines[3].startswith('cd -- ') or not lines[4].startswith('if [[ -x '):
+        return None
+    try:
+        old_root = shlex.split(lines[3][len('cd -- '):])
+        old_previous = shlex.split(lines[4][len('if [[ -x '):])
+    except ValueError:
+        return None
+    if len(old_root) != 1 or not old_previous or Path(old_previous[0]).name != 'pre-commit.before-bilibi':
+        return None
+    exact = ('#!/usr/bin/env bash\n# Bilibi repository guard v1\nset -euo pipefail\n'
+             + f'cd -- {shlex.quote(old_root[0])}\n'
+             + f'if [[ -x {shlex.quote(old_previous[0])} ]]; then {shlex.quote(old_previous[0])} "$@"; fi\n'
+             + 'exec ' + shlex.join([command[0], f'{old_root[0]}/{command[1]}', *command[2:]]) + '\n')
+    return exact == current
 
 
 def install(root, command):
@@ -50,7 +63,7 @@ def install(root, command):
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             if tracked.returncode == 0:
                 raise ValueError(f'{hook}: tracked hook left unchanged. Use an untracked repository-local hooks directory and copy your custom hook there before ./bilibi setup (README.md).')
-        legacy = LEGACY_GUARD.fullmatch(current)
+        legacy = legacy_guard(current, command)
         if not legacy and 'Bilibi repository guard' in current:
             raise ValueError(f'{hook}: installed guard has local edits; left unchanged. Reconcile them with pre-commit.before-bilibi before rerunning ./bilibi setup.')
         if not legacy:
