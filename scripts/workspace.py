@@ -160,6 +160,14 @@ def generated_output():
     return result
 
 
+def origin_serves(url, commit):
+    """A commit held only by a tag or pull request ref is published; an empty scratch repository cannot have it locally."""
+    with tempfile.TemporaryDirectory(prefix='bilibi-served-') as scratch:
+        run('git', 'init', '--quiet', scratch, cwd=ROOT)
+        return subprocess.run(['git', 'fetch', '--quiet', '--depth=1', url, commit], cwd=scratch,
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False).returncode == 0
+
+
 def update():
     """Fast-forward the application, then restore its saved source composition."""
     update_clean(ROOT)
@@ -222,8 +230,8 @@ def update():
             raise ValueError(f'{folder}: not in the incoming setup.toml; move this clone outside sources/ yourself, '
                              'or save it with ./bilibi pin and publish the application recipe before retrying')
         source = saved[name]
-        origin = subprocess.run(['git', 'config', '--get', 'remote.origin.url'], cwd=folder,
-                                text=True, stdout=subprocess.PIPE, check=False).stdout.strip()
+        origin = subprocess.run(['git', 'remote', 'get-url', 'origin'], cwd=folder,
+                                text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False).stdout.strip()
         if origin != source['url']:
             action = 'set-url' if origin else 'add'
             raise ValueError(f'{folder}: origin differs from setup.toml; inspect with {git_step(folder, "remote", "-v")}; '
@@ -234,7 +242,7 @@ def update():
         try:
             run('git', 'fetch', '--prune', '--tags', 'origin', cwd=folder)
             unpublished = run('git', 'rev-list', 'HEAD', '--not', '--remotes=origin', cwd=folder, capture=True).strip()
-            if unpublished:
+            if unpublished and not origin_serves(source['url'], run('git', 'rev-parse', 'HEAD', cwd=folder, capture=True).strip()):
                 raise ValueError(f'{folder}: unpushed commits; inspect with {git_step(folder, "log", "--oneline", "HEAD", "--not", "--remotes=origin")}, '
                                  f'then publish with {git_step(folder, "push", "origin", "HEAD:<branch>")} and rerun ./bilibi update')
             run('git', 'fetch', 'origin', source['commit'], cwd=folder)

@@ -42,12 +42,26 @@ class UpdateTest(unittest.TestCase):
         self.env = {key: value for key, value in os.environ.items()
                     if not key.startswith('GIT_') and key not in
                     ('BILIBI_SOURCE_DIR', 'BILIBI_BUILD_DIR', 'CARGO_TARGET_DIR')}
-        self.env.update(GIT_CONFIG_GLOBAL=str(self.root / 'gitconfig'), GIT_CONFIG_NOSYSTEM='1',
+        # Serve the fixture URLs from local bare repositories while leaving
+        # `git remote get-url` and `git config` reporting the saved HTTPS URLs.
+        shim = self.root / 'bin'
+        shim.mkdir()
+        rewrites = ''.join(
+            f'  export GIT_CONFIG_KEY_{index}=url.{(self.root / f"{name}.git").as_uri()}.insteadOf\n'
+            f'  export GIT_CONFIG_VALUE_{index}={url}\n'
+            for index, (name, url) in enumerate((('platform', PLATFORM_URL), ('finance', DOMAIN_URL))))
+        (shim / 'git').write_text(
+            '#!/bin/sh\n'
+            'case "$*" in\n'
+            f'  *"remote get-url"*) ;;\n  *)\n  export GIT_CONFIG_COUNT=2\n{rewrites}  ;;\n'
+            f'esac\nexec {shutil.which("git")} "$@"\n')
+        (shim / 'git').chmod(0o755)
+        self.env.update(PATH=f'{shim}:{os.environ["PATH"]}',
+                        GIT_CONFIG_GLOBAL=str(self.root / 'gitconfig'), GIT_CONFIG_NOSYSTEM='1',
                         GIT_AUTHOR_NAME='Test', GIT_AUTHOR_EMAIL='test@example.test',
                         GIT_COMMITTER_NAME='Test', GIT_COMMITTER_EMAIL='test@example.test')
         for name, url in (('platform', PLATFORM_URL), ('finance', DOMAIN_URL)):
             self.git(self.root, 'init', '--bare', str(self.root / f'{name}.git'))
-            self.git(self.root, 'config', '--global', f'url.{(self.root / f"{name}.git").as_uri()}.insteadOf', url)
         self.domain_origin = self.root / 'finance-author'
         self.git(self.root, 'clone', DOMAIN_URL, str(self.domain_origin))
         (self.domain_origin / 'notes').write_text('first domain\n')
@@ -190,6 +204,23 @@ class UpdateTest(unittest.TestCase):
                 else:
                     original = self.platform_first if folder == self.platform else self.domain_first
                     self.git(folder, 'checkout', '--detach', original)
+
+    def test_pin_published_only_as_a_tag_is_not_called_unpushed(self):
+        self.git(self.domain_origin, 'checkout', '-b', 'release-work')
+        (self.domain_origin / 'notes').write_text('tagged release\n')
+        self.commit(self.domain_origin, 'Tagged release')
+        tagged = self.git(self.domain_origin, 'rev-parse', 'HEAD')
+        self.git(self.domain_origin, 'push', 'origin', 'HEAD:refs/tags/release-1')
+        self.git(self.domain_origin, 'checkout', '-')
+        self.git(self.domain_origin, 'branch', '-D', 'release-work')
+        self.save_recipe(self.platform_first, tagged)
+        self.commit(self.author, 'Pin tagged release')
+        self.git(self.author, 'push')
+        self.command('update')
+        self.assertEqual(self.git(self.domain, 'rev-parse', 'HEAD'), tagged)
+        self.upstream()
+        self.command('update')
+        self.assertEqual(self.git(self.domain, 'rev-parse', 'HEAD'), self.domain_second)
 
     def test_refuses_staged_and_untracked_work(self):
         self.upstream()
