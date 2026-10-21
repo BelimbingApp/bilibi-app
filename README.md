@@ -59,7 +59,9 @@ The Platform keeps its existing runtime locations: `.local/dev` contains develop
 
 | Command | What it does |
 | --- | --- |
+| `./bilibi help` | List the commands. Running `./bilibi` without a command shows the same list. |
 | `./bilibi start` | Obtain missing sources, prepare prerequisites and start local development with the development seed. |
+| `./bilibi update` | Pull the application with a fast-forward, restore the saved component commits and regenerate composition files. |
 | `./bilibi setup` | Prepare missing sources, safeguards and prerequisites; preserve existing branches, staged files, edits and untracked files. |
 | `./bilibi add finance` | Install the Platform safeguard, then mount an official Domain or Extension from its catalogue. Existing destinations are preserved. |
 | `./bilibi add <id> --kind <domains\|extensions> --source <repository> --commit <commit>` | Mount the official repository at the exact commit shown by Software, even when the local catalogue does not list it. |
@@ -69,6 +71,8 @@ The Platform keeps its existing runtime locations: `.local/dev` contains develop
 | `./bilibi build` | Use the pinned builder to compile and verify the saved release composition with `--locked`. |
 
 `./bilibi new` belongs to the Platform repository. In an application repository, you already own the application recipe.
+
+Run `./bilibi update` to receive changes published to your application branch. It restores `sources/` to the commits saved in the updated `setup.toml` and restores the saved dependency lock. **Only `./bilibi pin` saves new component selections.** Update refuses real edits, staged files, untracked files and unpushed commits, and prints the affected path and next step. It can replace verified generated composition files. It never stashes your work or forces a checkout. An application branch needs a remote upstream; source commits must be published to their declared `origin`.
 
 Copy the install command from **Administration › System › Software** and run it from your application root:
 
@@ -123,7 +127,7 @@ Create a separate application clone with the updated template commands and your 
 
 To adopt a clean existing clone manually, stop only that workspace's own processes by PID, verify the resolved source and destination paths, and move `build/platform` to an absent `sources/platform` on the same filesystem. Preserve its `.git`, nested component repositories, local files and runtime data together. Inspect an existing `target/` directory and deliberately move its outputs into `build/target` before setup creates its output link. Run status and setup, then validate with disposable data before changing editor or service paths. Roll back by restoring those recorded paths and the old application checkout; retain its database and keys.
 
-Template updates are ordinary reviewed application changes: bring in the new wrapper, scripts and documentation on a branch while preserving your `setup.toml`, saved composition and application-specific automation. Resolve changes and run the saved-composition checks before merging. No update command overwrites your application automatically.
+Template updates are ordinary reviewed application changes: bring in the new wrapper, scripts and documentation on a branch while preserving your `setup.toml`, saved composition and application-specific automation. Resolve changes and run the saved-composition checks before merging. After those changes reach your application's remote branch, `./bilibi update` pulls them into a clean workspace. It does not import changes directly from the template repository.
 
 ## Release your setup
 
