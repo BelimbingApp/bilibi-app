@@ -109,7 +109,7 @@ export BILIBI_CHECK_DATABASE_URL=postgresql://YOUR-USER@127.0.0.1:5432/EMPTY-DIS
 ./bilibi build
 ```
 
-`DATABASE_URL` remains your development connection and is never an implicit check target. Check refuses the same database or a database with existing tables or views. Check leaves its migrations and production seed in the disposable database; provide a new empty database on the next run. Docker uses host networking to reach it. Set `SETUP_CI_PORT` if the default check port, 38971, is occupied.
+`DATABASE_URL` remains your development connection and is never an implicit check target. Check refuses the same database or a database with existing tables or views. Check leaves its migrations and production seed in the disposable database; provide a new empty database on the next run. It seeds that database as a Dev copy, because its boot check uses HTTP on a loopback address, which the Platform allows only for Dev copies. Docker uses host networking to reach it. Set `SETUP_CI_PORT` if the default check port, 38971, is occupied.
 
 `BILIBI_SOURCE_DIR` overrides the source directory; `BILIBI_BUILD_DIR` still overrides outputs and caches. `CARGO_TARGET_DIR` overrides Cargo output. Use absolute paths outside editable sources for outputs. The builder maps all three consistently into its container. Pin candidates always use their own directories and ignore these overrides.
 

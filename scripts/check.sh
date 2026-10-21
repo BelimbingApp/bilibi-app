@@ -52,7 +52,8 @@ python3 "$root/scripts/recipe.py" verify
 app="$CARGO_TARGET_DIR/$target/release/bilibi-web"
 python3 "$root/scripts/recipe.py" status --binary "$app"
 "$app" migrate
-"$app" seed-production
+# This disposable boot uses HTTP loopback, so install it explicitly as Dev.
+BILIBI_ENV=development "$app" seed-production
 port=${SETUP_CI_PORT:-38971}
 BIND_ADDR="127.0.0.1:$port" APP_ORIGIN="http://127.0.0.1:$port" "$app" run &
 server=$!
