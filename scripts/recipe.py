@@ -79,7 +79,7 @@ def check_sources():
             raise ValueError(f'{path}: expected an independent checkout')
         if run('git', 'rev-parse', 'HEAD', cwd=folder, capture=True).strip() != source['commit']:
             raise ValueError(f'{folder}: HEAD differs from setup.toml; commit and push local work, then run ./bilibi pin, or deliberately check out {source["commit"]}')
-        if run('git', 'remote', 'get-url', 'origin', cwd=folder, capture=True).strip() != source['url']:
+        if run('git', 'config', '--get', 'remote.origin.url', cwd=folder, capture=True).strip() != source['url']:
             raise ValueError(f'{path}: origin differs from setup.toml')
         # Only the discover-modules outputs may differ in the Platform checkout.
         changes = run('git', 'status', '--porcelain', '--untracked-files=all', cwd=folder, capture=True)
@@ -126,7 +126,7 @@ def materialize():
             # switch, reset, clean or restore a developer's existing working copy.
             checkout(folder)
             head = run('git', 'rev-parse', 'HEAD', cwd=folder, capture=True).strip()
-            origin = run('git', 'remote', 'get-url', 'origin', cwd=folder, capture=True).strip()
+            origin = run('git', 'config', '--get', 'remote.origin.url', cwd=folder, capture=True).strip()
             if head != source['commit'] or origin != source['url']:
                 print(f'{folder}: differs from setup.toml; local work preserved. Run ./bilibi status; commit and push before ./bilibi pin.')
 

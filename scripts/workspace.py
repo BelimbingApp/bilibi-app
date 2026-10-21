@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -108,6 +109,152 @@ def setup():
     output_paths()
     run('bash', ROOT / 'scripts/dev-setup.sh', PLATFORM)
     print('Setup complete. Local sources and runtime data are preserved. Run ./bilibi start.')
+
+
+def git_step(folder, *args):
+    return shlex.join(['git', '-C', str(folder), *args])
+
+
+def update_clean(folder, generated=None):
+    """Only byte-for-byte known generated output may be replaced by update."""
+    recipe.checkout(folder)
+    changes = run('git', 'status', '--porcelain=v1', '-z', '--untracked-files=all', cwd=folder, capture=True)
+    allowed = []
+    for entry in changes.split('\0'):
+        if not entry:
+            continue
+        path = entry[3:]
+        if (entry[:2] == ' M' and generated and path in generated
+                and not (folder / path).is_symlink()
+                and (folder / path).is_file()
+                and (folder / path).read_bytes() == generated[path]
+                and not run('git', 'diff', '--summary', '--', path, cwd=folder, capture=True)):
+            allowed.append(path)
+            continue
+        raise ValueError(f'{folder}: uncommitted work ({path}); inspect with '
+                         f'{git_step(folder, "status", "--short")}, then commit or stash it yourself and rerun ./bilibi update')
+    return allowed
+
+
+def generated_output():
+    if not PLATFORM.exists():
+        return {}
+    discovery = recipe.discovery_module()
+    try:
+        result = {str(path.relative_to(PLATFORM)): text.encode()
+                  for path, text in discovery.outputs(PLATFORM, discovery.discovered(PLATFORM)).items()}
+    except Exception as error:
+        raise ValueError(f'{PLATFORM}: cannot verify generated composition ({error}); run '
+                         f'{git_step(PLATFORM, "status", "--short")} and python3 '
+                         f'{shlex.quote(str(PLATFORM / "scripts/discover-modules.py"))} --check; '
+                         'resolve the reported source mismatch, then rerun ./bilibi update') from error
+    # Accept the saved application lock or an intact previously restored pin.
+    lock = PLATFORM / 'Cargo.lock'
+    for saved in (ROOT / 'composition', PLATFORM / '.local/composition'):
+        try:
+            if (recipe.digest(saved / 'Cargo.lock') == recipe.read(saved / 'manifest.txt')['cargo_lock_sha256']
+                    and lock.read_bytes() == (saved / 'Cargo.lock').read_bytes()):
+                result['Cargo.lock'] = lock.read_bytes()
+        except (OSError, ValueError, KeyError):
+            pass
+    return result
+
+
+def update():
+    """Fast-forward the application, then restore its saved source composition."""
+    update_clean(ROOT)
+    branch = run('git', 'branch', '--show-current', capture=True).strip()
+    if not branch:
+        raise ValueError(f'{ROOT}: detached HEAD; run {git_step(ROOT, "switch", "<application-branch>")} and rerun ./bilibi update')
+    remote = subprocess.run(['git', 'config', '--get', f'branch.{branch}.remote'], cwd=ROOT,
+                            text=True, stdout=subprocess.PIPE, check=False).stdout.strip()
+    if remote in ('', '.'):
+        raise ValueError(f'{ROOT}: no remote upstream; run {git_step(ROOT, "push", "--set-upstream", "origin", branch)} and rerun ./bilibi update')
+    try:
+        run('git', 'fetch', '--no-tags', remote)
+        upstream = run('git', 'rev-parse', '--symbolic-full-name', '@{upstream}', capture=True).strip()
+        target = run('git', 'rev-parse', upstream, capture=True).strip()
+    except subprocess.CalledProcessError as error:
+        raise ValueError(f'{ROOT}: cannot fetch the application upstream; run {git_step(ROOT, "fetch", remote)}, '
+                         'check the branch upstream with git branch -vv, then rerun ./bilibi update') from error
+    ahead = run('git', 'rev-list', f'{upstream}..HEAD', capture=True).strip()
+    if ahead:
+        raise ValueError(f'{ROOT}: commits are not in {upstream}; inspect with {git_step(ROOT, "log", "--oneline", f"{upstream}..HEAD")}, '
+                         f'then publish with {git_step(ROOT, "push")} (reconcile any divergence yourself) and rerun ./bilibi update')
+    # Read the incoming recipe without changing the application checkout first.
+    try:
+        with tempfile.TemporaryDirectory(prefix='bilibi-update-') as temp:
+            candidate = Path(temp)
+            (candidate / 'composition').mkdir()
+            for name in ('setup.toml', 'composition/manifest.txt', 'composition/Cargo.lock'):
+                data = subprocess.check_output(['git', 'show', f'{target}:{name}'], cwd=ROOT)
+                (candidate / name).write_bytes(data)
+            _, sources = recipe.recipe(candidate)
+            recipe.check_pin(candidate)
+    except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
+        raise ValueError(f'{ROOT}/setup.toml and composition/: incoming saved composition is invalid ({error}); '
+                         f'inspect with {git_step(ROOT, "show", target + ":setup.toml")}, '
+                         'ask the application maintainer to publish a consistent recipe, manifest and lock, then retry') from error
+    saved = dict(sources)
+    mounted = list(repositories())
+    for _, folder in mounted:
+        if folder.is_symlink() or folder.resolve() != folder or (folder.exists() and not folder.is_dir()):
+            raise ValueError(f'{folder}: conflicting source path; move it aside deliberately and rerun ./bilibi update')
+        if folder.exists():
+            recipe.checkout(folder)
+    for name, folder in mounted:
+        if folder.exists():
+            if name != 'platform':
+                update_clean(folder)
+            else:
+                # Reject edits to discovery itself before importing it. The
+                # generated bytes provisionally allowed here are verified below.
+                pending = {path: (folder / path).read_bytes() for path in recipe.GENERATED
+                           if (folder / path).is_file() and not (folder / path).is_symlink()}
+                update_clean(folder, pending)
+    generated = generated_output()
+    replacements = []
+    for name, folder in mounted:
+        if not folder.exists() and not folder.is_symlink():
+            continue
+        allowed = update_clean(folder, generated if name == 'platform' else None)
+        if name not in saved:
+            raise ValueError(f'{folder}: not in the incoming setup.toml; move this clone outside sources/ yourself, '
+                             'or save it with ./bilibi pin and publish the application recipe before retrying')
+        source = saved[name]
+        origin = subprocess.run(['git', 'config', '--get', 'remote.origin.url'], cwd=folder,
+                                text=True, stdout=subprocess.PIPE, check=False).stdout.strip()
+        if origin != source['url']:
+            action = 'set-url' if origin else 'add'
+            raise ValueError(f'{folder}: origin differs from setup.toml; inspect with {git_step(folder, "remote", "-v")}; '
+                             f'if the saved URL is correct, run {git_step(folder, "remote", action, "origin", source["url"])} and retry')
+        replacements.append((folder, source, allowed))
+    # Fetch only after every existing repository has passed the edit checks.
+    for folder, source, _ in replacements:
+        try:
+            run('git', 'fetch', '--prune', '--tags', 'origin', cwd=folder)
+            unpublished = run('git', 'rev-list', 'HEAD', '--not', '--remotes=origin', cwd=folder, capture=True).strip()
+            if unpublished:
+                raise ValueError(f'{folder}: unpushed commits; inspect with {git_step(folder, "log", "--oneline", "HEAD", "--not", "--remotes=origin")}, '
+                                 f'then publish with {git_step(folder, "push", "origin", "HEAD:<branch>")} and rerun ./bilibi update')
+            run('git', 'fetch', 'origin', source['commit'], cwd=folder)
+        except subprocess.CalledProcessError as error:
+            raise ValueError(f'{folder}: cannot obtain saved commit {source["commit"]}; run '
+                             f'{git_step(folder, "fetch", "origin", source["commit"])}; verify setup.toml with its owner, then retry') from error
+    head = run('git', 'rev-parse', 'HEAD', capture=True).strip()
+    if head != target:
+        run('git', '-c', 'core.hooksPath=/dev/null', 'merge', '--ff-only', '--no-autostash', target)
+        # Use the updated command implementation and recipe after pulling scripts.
+        os.execv(sys.executable, [sys.executable, str(ROOT / 'scripts/workspace.py'), 'update'])
+    for folder, source, allowed in replacements:
+        # These bytes were proven to be generated, and the index was clean.
+        for path in allowed:
+            (folder / path).write_bytes(subprocess.check_output(['git', 'show', f'HEAD:{path}'], cwd=folder))
+        if run('git', 'rev-parse', 'HEAD', cwd=folder, capture=True).strip() != source['commit']:
+            run('git', '-c', 'core.hooksPath=/dev/null', 'checkout', '--detach', source['commit'], cwd=folder)
+    recipe.materialize()
+    recipe.restore()
+    print('Updated application and restored saved source commits and composition. Use ./bilibi pin to save new selections.')
 
 
 def start():
@@ -278,8 +425,8 @@ def check_staged():
 
 def main():
     parser = argparse.ArgumentParser(prog='./bilibi', description=__doc__)
-    parser.add_argument('command', choices=('start', 'add', 'status', 'setup', 'check', 'pin', 'build', 'check-staged'),
-                        metavar='{start,add,status,setup,check,pin,build}')
+    parser.add_argument('command', nargs='?', choices=('help', 'start', 'update', 'add', 'status', 'setup', 'check', 'pin', 'build', 'check-staged'),
+                        metavar='{help,start,update,add,status,setup,check,pin,build}')
     parser.add_argument('component', nargs='?')
     parser.add_argument('--kind', choices=('domains', 'extensions'), help='add: component mount kind; give with --source and --commit')
     parser.add_argument('--source', help='add: official BelimbingApp repository URL from Software')
@@ -292,6 +439,18 @@ def main():
         raise ValueError('--kind, --source and --commit go together; give all three or none')
     if (args.command == 'add') != (args.component is not None):
         parser.error('Use ./bilibi add <component> [--kind domains|extensions --source <url> --commit <sha>]; other commands take no arguments')
+    if args.command in (None, 'help'):
+        print('Usage: ./bilibi <command>\n\n'
+              '  start          Prepare sources and start local development\n'
+              '  update         Pull the application and restore saved source commits\n'
+              '  add <id>       Mount an official Domain or Extension\n'
+              '  status         Show repositories, local changes and saved versions\n'
+              '  setup          Prepare sources, safeguards and prerequisites\n'
+              '  pin            Save validated component selections and dependencies\n'
+              '  check          Validate and test the saved composition\n'
+              '  build          Build the saved release composition\n'
+              '  help           Show this command list')
+        return
     if args.command == 'status':
         status()
         return
