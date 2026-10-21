@@ -65,8 +65,8 @@ def hooks():
     spec = importlib.util.spec_from_file_location('hooks', ROOT / 'scripts/install-hooks.py')
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    module.install(PLATFORM, ['python3', str(PLATFORM / 'scripts/discover-modules.py'), '--check'])
-    module.install(ROOT, ['python3', str(ROOT / 'scripts/workspace.py'), 'check-staged'])
+    module.install(PLATFORM, ['python3', 'scripts/discover-modules.py', '--check'])
+    module.install(ROOT, ['python3', 'scripts/workspace.py', 'check-staged'])
 
 
 def output_paths():

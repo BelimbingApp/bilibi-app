@@ -2,14 +2,20 @@
 """Install repository-local, repeatable guards, chaining an existing pre-commit."""
 import os
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import tempfile
 
-MARKER = '# Bilibi repository guard v1'
+MARKER = '# Bilibi repository guard v2'
+LEGACY_GUARD = re.compile(
+    r'#!/usr/bin/env bash\n# Bilibi repository guard v1\nset -euo pipefail\ncd -- .+\n'
+    r'if \[\[ -x .+/pre-commit\.before-bilibi\S* \]\]; then .+ "\$@"; fi\n'
+    r'exec python3 .+/scripts/(?:discover-modules\.py --check|workspace\.py check-staged)\n')
 
 
 def install(root, command):
+    """command is an interpreter, a script path relative to root, then arguments."""
     root = root.resolve()
     def git(*args):
         return subprocess.check_output(['git', '-C', str(root), *args], text=True).strip()
@@ -27,9 +33,12 @@ def install(root, command):
     if hook.is_symlink():
         raise ValueError(f'{hook}: symlink hook left unchanged; integrate the Bilibi guard in a repository-local hook (README.md)')
     text = ('#!/usr/bin/env bash\n' + MARKER + '\nset -euo pipefail\n'
-            + f'cd -- {shlex.quote(str(root))}\n'
-            + f'if [[ -x {shlex.quote(str(previous))} ]]; then {shlex.quote(str(previous))} "$@"; fi\n'
-            + 'exec ' + shlex.join(command) + '\n')
+            + 'root=$(git rev-parse --show-toplevel)\n'
+            + 'cd -- "$root"\n'
+            + 'previous=$(dirname -- "${BASH_SOURCE[0]}")/pre-commit.before-bilibi\n'
+            + 'if [[ -x $previous ]]; then "$previous" "$@"; fi\n'
+            + 'exec ' + ' '.join([shlex.quote(command[0]), '"$root"/' + shlex.quote(command[1]),
+                                  *map(shlex.quote, command[2:])]) + '\n')
     if hook.exists():
         current = hook.read_text()
         if current == text:
@@ -41,11 +50,13 @@ def install(root, command):
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             if tracked.returncode == 0:
                 raise ValueError(f'{hook}: tracked hook left unchanged. Use an untracked repository-local hooks directory and copy your custom hook there before ./bilibi setup (README.md).')
-        if MARKER in current:
+        legacy = LEGACY_GUARD.fullmatch(current)
+        if not legacy and 'Bilibi repository guard' in current:
             raise ValueError(f'{hook}: installed guard has local edits; left unchanged. Reconcile them with pre-commit.before-bilibi before rerunning ./bilibi setup.')
-        if previous.exists() or previous.is_symlink():
-            raise ValueError(f'{previous}: hook backup already exists; reconcile the two hooks before ./bilibi setup')
-        hook.rename(previous)
+        if not legacy:
+            if previous.exists() or previous.is_symlink():
+                raise ValueError(f'{previous}: hook backup already exists; reconcile the two hooks before ./bilibi setup')
+            hook.rename(previous)
     with tempfile.NamedTemporaryFile(prefix='.bilibi-hook-', dir=hooks, mode='w', delete=False) as stream:
         stream.write(text)
         temporary = Path(stream.name)
