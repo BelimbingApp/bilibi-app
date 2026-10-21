@@ -6,7 +6,7 @@ ARG DEBIAN_SNAPSHOT
 # All Debian dependencies come from one dated package index. No moving apt mirror.
 RUN rm -f /etc/apt/sources.list.d/* && \
     printf 'deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/%s bookworm main\n' "$DEBIAN_SNAPSHOT" > /etc/apt/sources.list && \
-    apt-get update && apt-get install -y --no-install-recommends python3 && \
+    apt-get update && apt-get install -y --no-install-recommends python3 postgresql-client && \
     rm -rf /var/lib/apt/lists/*
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
