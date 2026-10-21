@@ -11,11 +11,13 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import uuid
 
 import recipe
 
 ROOT, PLATFORM, BUILD = recipe.ROOT, recipe.PLATFORM, recipe.BUILD
+OFFICIAL = re.compile(r'https://github\.com/BelimbingApp/[A-Za-z0-9][A-Za-z0-9_.-]*(?:\.git)?')
 
 
 def run(*args, cwd=ROOT, capture=False):
@@ -122,9 +124,52 @@ def start():
     os.execvp('bash', ['bash', '-c', 'if [[ -f $HOME/.cargo/env ]]; then source "$HOME/.cargo/env"; fi; exec bash scripts/start-app.sh'])
 
 
-def add(component):
+def add_explicit(component, kind, source, commit):
+    """Keep Software's explicit-source contract in step with Platform add."""
+    if component in {'base', 'core', 'web', 'src'}:
+        raise ValueError('use a component ID from catalogue.json, for example: ./bilibi add finance')
+    if not re.fullmatch(r'[0-9a-f]{40}', commit):
+        raise ValueError('--commit must be a full 40-character lowercase commit ID')
+    if not OFFICIAL.fullmatch(source):
+        raise ValueError(f'{component} is not an official BelimbingApp repository; use the manual mounting guide')
+    recipe.materialize()
+    hooks()
+    folder = PLATFORM / 'apps' / kind / component
+    if folder.exists() or folder.is_symlink():
+        if folder.is_symlink() or not folder.is_dir():
+            raise ValueError(f'{folder} is occupied; move it aside deliberately before adding {component}')
+        if Path(run('git', 'rev-parse', '--show-toplevel', cwd=folder, capture=True).strip()).resolve() != folder.resolve():
+            raise ValueError(f'{folder} is not its own Git checkout; move it aside deliberately')
+        actual = run('git', 'remote', 'get-url', 'origin', cwd=folder, capture=True).strip().removesuffix('.git')
+        if actual != source.removesuffix('.git'):
+            raise ValueError(f'{folder} has a different origin; inspect it with git -C {folder} remote -v '
+                             'and reconcile it deliberately; no files or remotes were changed')
+        if run('git', 'rev-parse', 'HEAD', cwd=folder, capture=True).strip() != commit:
+            raise ValueError(f'{folder} is not at commit {commit}. Commit or stash its work, then run: '
+                             f'git -C {folder} fetch origin && git -C {folder} checkout --detach {commit}; '
+                             'nothing was changed')
+        print(f'Keeping existing checkout, branch and edits: {folder}', flush=True)
+    else:
+        run('git', 'clone', '--', source.removesuffix('.git') + '.git', folder)
+        try:
+            run('git', 'checkout', '--detach', commit, cwd=folder)
+        except subprocess.CalledProcessError:
+            raise ValueError(f'{source} has no commit {commit}; the new clone was kept at {folder}. '
+                             f'Check the commit in Software, then remove that clone (rm -rf {folder}) and retry') from None
+    descriptor = tomllib.loads((folder / 'bilibi.container.toml').read_text())
+    if descriptor.get('id') != component or descriptor.get('layer') != {'domains': 'domain', 'extensions': 'extension'}[kind]:
+        raise ValueError(f'{folder}/bilibi.container.toml does not match the requested component; '
+                         'checkout retained for inspection')
+    print(f'Added {component} at {folder}. Run ./bilibi start. Commit and push component edits before ./bilibi pin.')
+
+
+def add(component, kind=None, source=None, commit=None):
     if not re.fullmatch(r'[a-z][a-z0-9]*(?:_[a-z0-9]+)*', component):
+        if kind is not None:
+            raise ValueError('use a component ID from catalogue.json, for example: ./bilibi add finance')
         raise ValueError('Use a component ID such as finance or supply_chain.')
+    if kind is not None:
+        return add_explicit(component, kind, source, commit)
     # Obtain missing sources and install the guard even before the first start.
     recipe.materialize()
     hooks()
@@ -232,13 +277,21 @@ def check_staged():
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(prog='./bilibi', description=__doc__)
     parser.add_argument('command', choices=('start', 'add', 'status', 'setup', 'check', 'pin', 'build', 'check-staged'),
                         metavar='{start,add,status,setup,check,pin,build}')
     parser.add_argument('component', nargs='?')
+    parser.add_argument('--kind', choices=('domains', 'extensions'), help='add: component mount kind; give with --source and --commit')
+    parser.add_argument('--source', help='add: official BelimbingApp repository URL from Software')
+    parser.add_argument('--commit', help='add: exact full lowercase commit ID from Software')
     args = parser.parse_args()
+    supplied = (args.kind is not None, args.source is not None, args.commit is not None)
+    if any(supplied) and args.command != 'add':
+        parser.error('--kind, --source and --commit are only for ./bilibi add')
+    if any(supplied) and not all(supplied):
+        raise ValueError('--kind, --source and --commit go together; give all three or none')
     if (args.command == 'add') != (args.component is not None):
-        parser.error('Use ./bilibi add <component>; other commands take no arguments')
+        parser.error('Use ./bilibi add <component> [--kind domains|extensions --source <url> --commit <sha>]; other commands take no arguments')
     if args.command == 'status':
         status()
         return
@@ -250,7 +303,7 @@ def main():
     with (local / 'workspace.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         if args.command == 'add':
-            add(args.component)
+            add(args.component, args.kind, args.source, args.commit)
         elif args.command in ('check', 'build'):
             recipe.check_sources()
             recipe.check_pin()
