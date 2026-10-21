@@ -9,12 +9,16 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import tomllib
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 BUILD = Path(os.environ.get('BILIBI_BUILD_DIR', ROOT / 'build')).resolve()
-PLATFORM = BUILD / 'platform'
+SOURCES = Path(os.environ.get('BILIBI_SOURCE_DIR', ROOT / 'sources')).resolve()
+PLATFORM = SOURCES / 'platform'
+if BUILD == SOURCES or BUILD.is_relative_to(SOURCES) or SOURCES.is_relative_to(BUILD):
+    raise SystemExit('Keep BILIBI_SOURCE_DIR and BILIBI_BUILD_DIR separate; sources must never live under disposable build outputs')
 TARGET = 'x86_64-unknown-linux-gnu'
 GENERATED = {'Cargo.lock'} | {
     f'apps/{layer}/{name}' for layer in ('base', 'core', 'domains', 'extensions')
@@ -37,8 +41,8 @@ def digest(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
-def recipe():
-    setup = read(ROOT / 'setup.toml')
+def recipe(root=ROOT):
+    setup = read(root / 'setup.toml')
     if set(setup) - {'format', 'targets', 'platform', 'domains', 'extensions'}:
         raise ValueError('Unknown setup.toml keys')
     if setup.get('format') != 1 or setup.get('targets') != [TARGET]:
@@ -69,10 +73,12 @@ def check_sources():
     _, sources = recipe()
     for path, source in sources:
         folder = PLATFORM if path == 'platform' else PLATFORM / path
+        if not folder.exists():
+            raise ValueError(f'{folder}: missing; run ./bilibi setup')
         if folder.is_symlink() or Path(run('git', 'rev-parse', '--show-toplevel', cwd=folder, capture=True).strip()).resolve() != folder:
             raise ValueError(f'{path}: expected an independent checkout')
         if run('git', 'rev-parse', 'HEAD', cwd=folder, capture=True).strip() != source['commit']:
-            raise ValueError(f'{path}: HEAD differs from setup.toml; use a fresh build folder')
+            raise ValueError(f'{folder}: HEAD differs from setup.toml; commit and push local work, then run ./bilibi pin, or deliberately check out {source["commit"]}')
         if run('git', 'remote', 'get-url', 'origin', cwd=folder, capture=True).strip() != source['url']:
             raise ValueError(f'{path}: origin differs from setup.toml')
         # Only the discover-modules outputs may differ in the Platform checkout.
@@ -89,31 +95,76 @@ def check_sources():
         raise ValueError(f'Mounted source set differs: expected {expected}, found {actual}')
 
 
+def checkout(folder):
+    if folder.is_symlink() or Path(run('git', 'rev-parse', '--show-toplevel', cwd=folder, capture=True).strip()).resolve() != folder:
+        raise ValueError(f'{folder}: expected an independent checkout; move the conflicting path aside yourself')
+
+
+def clone(source, folder):
+    """Only an absent destination is ours to populate; failures leave no partial clone."""
+    folder.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='.clone-', dir=folder.parent) as temp:
+        pending = Path(temp) / 'repository'
+        run('git', 'clone', '--no-checkout', '--', source['url'], str(pending), cwd=folder.parent)
+        run('git', 'fetch', '--tags', 'origin', source['commit'], cwd=pending)
+        run('git', 'checkout', '--detach', source['commit'], cwd=pending)
+        if folder.exists() or folder.is_symlink():
+            raise ValueError(f'{folder}: destination appeared during cloning; left unchanged')
+        pending.rename(folder)
+
+
 def materialize():
     _, sources = recipe()
-    BUILD.mkdir(parents=True, exist_ok=True)
     for path, source in sources:
         folder = PLATFORM if path == 'platform' else PLATFORM / path
-        if not folder.exists():
-            # --no-checkout avoids executing any source before the selected commit.
-            run('git', 'clone', '--no-checkout', '--', source['url'], str(folder), cwd=BUILD)
-            run('git', 'fetch', '--tags', 'origin', source['commit'], cwd=folder)
-            run('git', 'checkout', '--detach', source['commit'], cwd=folder)
-        # Fetch tags even for a previously materialized checkout. Pin/restore also
-        # compares version labels, so a changed version tag cannot silently drift.
-        run('git', 'fetch', '--tags', 'origin', cwd=folder)
-    check_sources()
+        if folder.resolve() != folder:
+            raise ValueError(f'{folder}: source path traverses a symlink; keep ordinary independent clones')
+        if not folder.exists() and not folder.is_symlink():
+            clone(source, folder)
+        else:
+            # Setup is deliberately offline for existing repositories. Never fetch,
+            # switch, reset, clean or restore a developer's existing working copy.
+            checkout(folder)
+            head = run('git', 'rev-parse', 'HEAD', cwd=folder, capture=True).strip()
+            origin = run('git', 'remote', 'get-url', 'origin', cwd=folder, capture=True).strip()
+            if head != source['commit'] or origin != source['url']:
+                print(f'{folder}: differs from setup.toml; local work preserved. Run ./bilibi status; commit and push before ./bilibi pin.')
 
 
-def check_pin():
+def discovery_module():
+    module_spec = importlib.util.spec_from_file_location('discovery', PLATFORM / 'scripts/discover-modules.py')
+    discovery = importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(discovery)
+    return discovery
+
+
+def verify_remote():
+    """Prove remote availability and version labels without local objects or credentials on disk."""
     _, sources = recipe()
-    pin = read(ROOT / 'composition/manifest.txt')
+    pin = check_pin()
+    BUILD.mkdir(parents=True, exist_ok=True)
+    discovery = discovery_module()
+    with tempfile.TemporaryDirectory(prefix='source-proof-', dir=BUILD) as temp:
+        for index, (path, source) in enumerate(sources):
+            folder = Path(temp) / str(index)
+            clone(source, folder)
+            if path == 'platform':
+                expected = (pin.get('platform_tag') or '')[1:] or None
+            else:
+                expected = pin['containers'][path.removeprefix('apps/')].get('version')
+            if discovery.version_at_head(path, folder) != expected:
+                raise ValueError(f'{path}: remote version tags differ from the saved pin')
+
+
+def check_pin(root=ROOT):
+    _, sources = recipe(root)
+    pin = read(root / 'composition/manifest.txt')
     if pin['platform'] != sources[0][1]['commit']:
         raise ValueError('The saved pin names another Platform commit; run pin after editing setup.toml')
     containers = {path.removeprefix('apps/'): source['commit'] for path, source in sources[1:]}
     if {name: item['head'] for name, item in pin.get('containers', {}).items()} != containers:
         raise ValueError('The saved pin names other Domains or Extensions; run pin')
-    if digest(ROOT / 'composition/Cargo.lock') != pin['cargo_lock_sha256']:
+    if digest(root / 'composition/Cargo.lock') != pin['cargo_lock_sha256']:
         raise ValueError('The saved Cargo.lock does not match the pin')
     return pin
 
@@ -130,9 +181,7 @@ def restore():
     run('python3', 'scripts/discover-modules.py', '--restore')
     run('python3', 'scripts/discover-modules.py', '--check')
     # Compare all saved version tags with the tags actually fetched.
-    module_spec = importlib.util.spec_from_file_location('discovery', PLATFORM / 'scripts/discover-modules.py')
-    discovery = importlib.util.module_from_spec(module_spec)
-    module_spec.loader.exec_module(discovery)
+    discovery = discovery_module()
     tag = pin.get('platform_tag')
     if discovery.version_at_head('Platform', PLATFORM) != (tag[1:] if tag else None):
         raise ValueError('Platform version tags changed since pinning')
@@ -142,7 +191,7 @@ def restore():
     check_sources()
 
 
-def pin():
+def pin_candidate():
     check_sources()
     run('python3', 'scripts/discover-modules.py')
     run('bash', 'scripts/build-assets.sh', '--check')
@@ -181,7 +230,7 @@ def checked_status(binary):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=('materialize', 'pin', 'restore', 'verify', 'status'))
+    parser.add_argument('command', choices=('materialize', 'pin-candidate', 'restore', 'verify', 'verify-remote', 'check-pin', 'status'))
     parser.add_argument('--binary', type=Path)
     args = parser.parse_args()
     if args.command == 'status':
@@ -193,11 +242,11 @@ def main():
         if digest(PLATFORM / 'Cargo.lock') != digest(ROOT / 'composition/Cargo.lock'):
             raise ValueError('The restored lock changed during validation')
     else:
-        globals()[args.command]()
+        globals()[args.command.replace('-', '_')]()
 
 
 if __name__ == '__main__':
     try:
         main()
-    except (ValueError, KeyError, subprocess.CalledProcessError) as error:
+    except (ValueError, KeyError, OSError, subprocess.CalledProcessError) as error:
         sys.exit(str(error))

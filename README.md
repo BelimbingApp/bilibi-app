@@ -1,55 +1,122 @@
-# Your Bilibi setup
+# Bilibi application starting point
 
-This repository records your Bilibi Platform, Domains and Extensions, then builds a release you can upload to your servers.
+This repository is what `./bilibi new <name>` copies when you keep an application of your own.
 
-The example includes the Platform and Finance Domain at exact commits. Your repository holds the recipe and dependency lock. The source checkouts and compiled programs stay in ignored build folders.
-
-## Create your setup
-
-Choose **Use this template → Create a new repository** on GitHub. Use one repository for each distinct setup. You can make yours public or private.
-
-Before releasing, enable **release immutability** in your repository's Settings. Protect `main` and the `setup-v*` tags so only your release maintainers can change them. Allow GitHub Actions to run in the new repository.
-
-Clone your repository on a development machine with Docker, Git and Python 3.11 or newer:
+**New to Bilibi? Start in [bilibi](https://github.com/BelimbingApp/bilibi):**
 
 ```sh
-git clone https://github.com/YOUR-ORGANISATION/YOUR-SETUP.git
-cd YOUR-SETUP
-python3 scripts/recipe.py materialize
-scripts/builder.sh python3 scripts/recipe.py restore
+git clone https://github.com/BelimbingApp/bilibi
+cd bilibi && ./bilibi start
 ```
 
-This downloads the recorded sources and restores the saved composition. It does not choose newer dependencies. **Build in development or GitHub Actions; servers install the finished release.**
+You can try Bilibi without creating a GitHub account or choosing a template. Later, `./bilibi new <name>` in that Platform clone creates your application repository.
 
-## Change the Platform, Domains or Extensions
+## Run an existing application
 
-Edit `setup.toml`. Each source needs an HTTPS Git URL without credentials and a full 40-character commit ID. A Domain or Extension also needs its declared `id`, which determines its mount folder.
-
-For example, the Finance source mounts at `build/platform/apps/domains/finance`. Extensions use `[[extensions]]` entries and mount at `build/platform/apps/extensions/<id>`. Each source remains an independent Git clone, with its tags fetched for version labels.
-
-Move the previous build folder aside, then prepare the new recipe:
+Clone your application's repository, then run:
 
 ```sh
-mv build build-previous
-python3 scripts/recipe.py materialize
-scripts/builder.sh python3 scripts/recipe.py pin
+./bilibi start
+```
+
+The same command works with or without an AI agent. It obtains missing sources, installs commit safeguards, prepares missing prerequisites, and starts the existing development launcher. The launcher prints the address and development sign-in (`ai@agent.my` / `bilibi-dev`). Local HTTPS may need manual trust; the launcher keeps its loopback HTTP fallback.
+
+Use apt-based Ubuntu or Debian, including WSL2, with Git, Bash, Python 3.11 or newer, network access and installation privileges. Setup may ask for your sudo password. Ubuntu 22.04 and Debian 11 ship older Python; install Python 3.11 or newer as `python3`, or use Ubuntu 24.04 or Debian 12. Setup prepares Rust, Node, PostgreSQL 18 and cargo-watch through the Platform's existing scripts. Release commands also need Docker with a running daemon and the pinned builder described below.
+
+## Your workspace
+
+```text
+my-bilibi/                         # application Git repository
+├── bilibi                         # common command entry point
+├── setup.toml                     # URLs and exact component commits
+├── composition/
+│   ├── manifest.txt               # saved component identity
+│   └── Cargo.lock                 # saved application dependency lock
+├── scripts/
+├── sources/                       # ignored, valuable editable clones
+│   └── platform/                  # independent Platform Git repository
+│       └── apps/
+│           ├── domains/finance/   # independent Domain Git repository
+│           └── extensions/        # optional independent Extension clones
+├── build/                         # ignored outputs and caches
+└── .local/                        # ignored workspace state
+```
+
+| Change | Repository to commit in |
+| --- | --- |
+| Application versions, manifest, lock, automation and documentation | Application root |
+| Platform source and its unmounted generated composition | `sources/platform/` |
+| Domain or Extension source | That component's own Git root |
+| Build outputs, caches, keys, runtime data and local state | Never commit |
+
+**Keep `sources/`: these are working repositories, not disposable build output.** Domains and Extensions remain ordinary nested clones at their existing Platform mount paths. They are neither submodules nor source symlinks. Older Platform launchers use an ignored `sources/platform/target` output link pointing into `build/target`; setup refuses to replace an existing target path.
+
+`./bilibi status` shows every Git root, branch, local change and difference from the saved versions. Startup runs your local branches and edits. It does not update `setup.toml` or describe a stale saved pin as the running development version.
+
+The Platform keeps its existing runtime locations: `.local/dev` contains development keys, `.local/postgres18` contains the private development database, and existing media and configuration paths remain unchanged. Environment variables retain their existing meaning. Workspace `.local/` contains command coordination and temporary pin candidates; runtime data is not moved there.
+
+## Commands
+
+| Command | What it does |
+| --- | --- |
+| `./bilibi start` | Obtain missing sources, prepare prerequisites and start local development with the development seed. |
+| `./bilibi setup` | Prepare missing sources, safeguards and prerequisites; preserve existing branches, staged files, edits and untracked files. |
+| `./bilibi add finance` | Install the Platform safeguard, then mount an official Domain or Extension from its catalogue. Existing destinations are preserved. |
+| `./bilibi status` | Show application and component Git roots, branches, changes and saved-version differences. |
+| `./bilibi pin` | Record committed component selections and resolved dependencies after validating a disposable candidate. |
+| `./bilibi check` | Validate the saved commits and lock, format, lint, build, migrate, seed and boot against a separate empty database. |
+| `./bilibi build` | Use the pinned builder to compile and verify the saved release composition with `--locked`. |
+
+`./bilibi new` belongs to the Platform repository. In an application repository, you already own the application recipe.
+
+Repeated setup does not fetch existing clones, so an unavailable remote cannot discard or block work already present. It never resets, cleans, switches or removes an existing checkout. A saved-version mismatch prints the path and next action. Strict checks and release builds instead require the saved commits and clean sources, except for recognised generated composition files.
+
+## Save selected versions
+
+Edit component source in its own repository, commit it and push it to its declared `origin`. Then run:
+
+```sh
+./bilibi pin
 git diff -- setup.toml composition/
 ```
 
-`pin` checks the assets, resolves dependencies, and uses the Platform's `discover-modules.py --pin` to save `composition/manifest.txt` and `composition/Cargo.lock`. Review and commit all three files together. Keep at least one real Domain or Extension until the Platform supports pinning an empty setup.
+Pin reads the current Platform, Domain and Extension commits and origins, including components mounted by `add`. It refuses uncommitted edits outside recognised generated composition. It reconstructs a candidate from the declared HTTPS remotes without reusing local Git objects, checks assets, resolves dependencies in the pinned builder and validates the resulting pin and lock. Only then does it replace `setup.toml`, `composition/manifest.txt` and `composition/Cargo.lock`. A failed candidate leaves the previous saved set intact. Review and commit all three together.
 
-Open a pull request. **Check setup** restores the saved pin and lock, checks discovery, assets, formatting and Clippy, and builds every workspace member. It then migrates an empty PostgreSQL 18 database, applies production seeds, boots the app and requests `/`. It never runs an unlocked dependency resolution or rewrites the saved recipe.
+Each source URL must use HTTPS without credentials and each commit must be a full lowercase 40-character ID. Domains and Extensions also need their declared `id`. Domains and Extensions are optional.
 
-You can run the same gates locally with an empty disposable PostgreSQL 18 database:
+Checks restore the saved lock; they never resolve a new dependency set. They verify remote availability and saved version tags independently of your local objects. A local-only commit is insufficient for a release.
+
+Run the combined gates with a **separate empty disposable PostgreSQL 18 database**:
 
 ```sh
-export DATABASE_URL=postgresql://YOUR-USER@127.0.0.1:5432/EMPTY-DISPOSABLE-DATABASE
-scripts/builder.sh scripts/check.sh
+export BILIBI_CHECK_DATABASE_URL=postgresql://YOUR-USER@127.0.0.1:5432/EMPTY-DISPOSABLE-DATABASE
+./bilibi check
+./bilibi build
 ```
 
-The builder uses host networking to reach that database. Choose another `SETUP_CI_PORT` if its default application port, 38971, is occupied.
+`DATABASE_URL` remains your development connection and is never an implicit check target. Check refuses the same database or a database with existing tables or views. Check leaves its migrations and production seed in the disposable database; provide a new empty database on the next run. Docker uses host networking to reach it. Set `SETUP_CI_PORT` if the default check port, 38971, is occupied.
+
+`BILIBI_SOURCE_DIR` overrides the source directory; `BILIBI_BUILD_DIR` still overrides outputs and caches. `CARGO_TARGET_DIR` overrides Cargo output. Use absolute paths outside editable sources for outputs. The builder maps all three consistently into its container. Pin candidates always use their own directories and ignore these overrides.
+
+## Commit safeguards
+
+Setup installs a repository-local Platform pre-commit hook that runs its own `scripts/discover-modules.py --check`. This rejects staged mounted composition and foreign path packages in the Platform lock. The application pre-commit hook validates the staged recipe, manifest and lock together; its application lock is allowed in Git. CI also validates the saved set because local hooks can be bypassed.
+
+An existing executable pre-commit hook is preserved as `pre-commit.before-bilibi` in the same hook directory and runs first. Its failure stops the commit. Installation is repeatable; edits to an installed guard are left unchanged with a recovery message. It does not change `core.hooksPath` or global Git configuration. Tracked or symlink hooks, and hook directories outside this repository, are refused so setup cannot rewrite source files or shared hooks. For a shared hook path, configure a local hook directory (for example `git config --local core.hooksPath .git/hooks` in an ordinary clone), copy the hooks you want to retain there, inspect their relative-path assumptions, then rerun `./bilibi setup`. For a symlink hook, copy its target into that local directory as an ordinary executable first.
+
+## Update an older application workspace
+
+Keep the old checkout and runtime data until a parallel workspace has been used successfully. First record the old paths, remotes, branches, commits, staged and unstaged changes, untracked files, configuration and active processes. Inspect keys and database locations without printing secrets.
+
+Create a separate application clone with the updated template commands and your reviewed recipe and composition. Run setup there. Validate with a separate database and local data paths. Transfer or commit source edits deliberately in their owning repositories; setup does not migrate the old `build/platform` clone. Do not delete the old `build/`: older layouts keep valuable sources there.
+
+To adopt a clean existing clone manually, stop only that workspace's own processes by PID, verify the resolved source and destination paths, and move `build/platform` to an absent `sources/platform` on the same filesystem. Preserve its `.git`, nested component repositories, local files and runtime data together. Inspect an existing `target/` directory and deliberately move its outputs into `build/target` before setup creates its output link. Run status and setup, then validate with disposable data before changing editor or service paths. Roll back by restoring those recorded paths and the old application checkout; retain its database and keys.
+
+Template updates are ordinary reviewed application changes: bring in the new wrapper, scripts and documentation on a branch while preserving your `setup.toml`, saved composition and application-specific automation. Resolve changes and run the saved-composition checks before merging. No update command overwrites your application automatically.
 
 ## Release your setup
+
+**Build in development or GitHub Actions; servers install the finished release.** Before releasing, enable **release immutability** in your application repository's Settings. Protect `main` and the `setup-v*` tags so only release maintainers can change them, and allow GitHub Actions to run.
 
 After the checks pass, tag the reviewed recipe commit:
 
@@ -93,7 +160,7 @@ An uploaded file remains operator supplied. Its checksum detects damaged bytes; 
 
 If a source is private, create a `SOURCE_READ_TOKEN` Actions secret with read access to only the required source repositories. The setup repository's normal token may not read another private repository.
 
-The materialization step passes this secret through a temporary password helper. It saves no Git credentials and caches only Cargo downloads and build outputs. Pull requests receive no source token, so private-source checks must run on a trusted branch or tag. Never put a token in `setup.toml`, a Git URL, the lock, a cache or a release asset.
+The materialization and remote-verification step passes this secret through a password helper restricted to `https://github.com`. Unexpected hosts and prompts are refused. Sources on other hosts use your own host-specific credential helper. It saves no Git credentials and caches only Cargo downloads and build outputs. Pull requests receive no source token, so private-source checks must run on a trusted branch or tag. Never put a token in `setup.toml`, a Git URL, the lock, a cache or a release asset.
 
 For local private-source access, use your own Git credential helper or `GIT_ASKPASS`. No server credentials belong in Actions.
 

@@ -5,12 +5,14 @@ import subprocess
 import sys
 import tempfile
 
+import recipe
+
 from publish import verify_files
 
 root = Path(__file__).resolve().parent.parent
 before = verify_files(root / 'dist')
 # Keep proof under build/, never in the install archive or Git index.
-with tempfile.TemporaryDirectory(prefix='package-proof-', dir=root / 'build') as temp:
+with tempfile.TemporaryDirectory(prefix='package-proof-', dir=recipe.BUILD) as temp:
     saved = Path(temp) / 'dist'
     (root / 'dist').rename(saved)
     try:
