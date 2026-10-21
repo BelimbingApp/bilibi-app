@@ -42,25 +42,21 @@ class UpdateTest(unittest.TestCase):
         self.env = {key: value for key, value in os.environ.items()
                     if not key.startswith('GIT_') and key not in
                     ('BILIBI_SOURCE_DIR', 'BILIBI_BUILD_DIR', 'CARGO_TARGET_DIR')}
-        # Serve the fixture URLs from local bare repositories while leaving
-        # `git remote get-url` and `git config` reporting the saved HTTPS URLs.
-        shim = self.root / 'bin'
-        shim.mkdir()
-        rewrites = ''.join(
-            f'  export GIT_CONFIG_KEY_{index}=url.{(self.root / f"{name}.git").as_uri()}.insteadOf\n'
-            f'  export GIT_CONFIG_VALUE_{index}={url}\n'
-            for index, (name, url) in enumerate((('platform', PLATFORM_URL), ('finance', DOMAIN_URL))))
-        (shim / 'git').write_text(
-            '#!/bin/sh\n'
-            'case "$*" in\n'
-            f'  *"remote get-url"*) ;;\n  *)\n  export GIT_CONFIG_COUNT=2\n{rewrites}  ;;\n'
-            f'esac\nexec {shutil.which("git")} "$@"\n')
-        (shim / 'git').chmod(0o755)
-        self.env.update(PATH=f'{shim}:{os.environ["PATH"]}',
-                        GIT_CONFIG_GLOBAL=str(self.root / 'gitconfig'), GIT_CONFIG_NOSYSTEM='1',
+        # Real Git runs unchanged. Only its HTTPS transport helper is replaced so the
+        # fixture HTTPS origins are served from local bare repositories.
+        real_exec_path = Path(subprocess.check_output(['git', '--exec-path'], text=True).strip())
+        exec_path = self.root / 'git-core'
+        exec_path.mkdir()
+        for entry in real_exec_path.iterdir():
+            if not entry.name.startswith(('git-remote-http', 'git-remote-ftp')):
+                (exec_path / entry.name).symlink_to(entry)
+        helper = exec_path / 'git-remote-https'
+        helper.write_text(f'#!/bin/sh\nexec git remote-ext "$1" "git %s {self.root}/$(basename "$2")"\n')
+        helper.chmod(0o755)
+        self.env.update(GIT_EXEC_PATH=str(exec_path), GIT_CONFIG_GLOBAL=str(self.root / 'gitconfig'), GIT_CONFIG_NOSYSTEM='1',
                         GIT_AUTHOR_NAME='Test', GIT_AUTHOR_EMAIL='test@example.test',
                         GIT_COMMITTER_NAME='Test', GIT_COMMITTER_EMAIL='test@example.test')
-        for name, url in (('platform', PLATFORM_URL), ('finance', DOMAIN_URL)):
+        for name in ('platform', 'finance'):
             self.git(self.root, 'init', '--bare', str(self.root / f'{name}.git'))
         self.domain_origin = self.root / 'finance-author'
         self.git(self.root, 'clone', DOMAIN_URL, str(self.domain_origin))
