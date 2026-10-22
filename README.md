@@ -1,6 +1,23 @@
-# Bilibi application starting point
+# Bilibi application template
 
-[bilibi-app](https://github.com/BelimbingApp/bilibi-app) is what `./bilibi new <name>` copies when you keep an application of your own.
+This is the template for Bilibi applications. You don't work in it directly: `./bilibi new <name>` copies it, and the copy becomes your own application.
+
+> [!NOTE]
+> In your application, replace this introduction and **Which repository?** with your own. The sections from **Run an existing application** onward describe your application as they are.
+
+## Which repository?
+
+Bilibi has three kinds of repository. Most people start in `bilibi`, not here.
+
+| Repository | What it holds | Use it to |
+| --- | --- | --- |
+| [`bilibi`](https://github.com/BelimbingApp/bilibi) | The Platform's source code | Try Bilibi, change the Platform, and add Domains and Extensions to develop or test them |
+| `bilibi-app-template` (this one) | The template for applications | Change what every new application starts with. Most people never work in it. |
+| Your application, such as `your-company/my-bilibi` | One product: the Platform, Domain and Extension versions it uses | Develop your product, build releases, and install them on your servers |
+
+For example, you try Bilibi in a `bilibi` clone and add the Finance Domain. When you want to keep that setup as your own product, you run `./bilibi new my-bilibi` there. It copies this template into a new `my-bilibi` folder and records the Platform and Finance versions in it. From then on, you develop and release from `my-bilibi`.
+
+A template is a ready-made starting copy. You don't work in it; you copy it and change the copy. Your copy keeps the template's working parts as they are, such as the `./bilibi` commands, the checks and the release scripts. You replace its sample parts with your own, such as the example recipe in `setup.toml` and the `YOUR-ORGANISATION` names in this README. When the template improves later, you can merge its changes into your copy: see [Take template updates](#take-template-updates).
 
 **New to Bilibi? Start in [bilibi](https://github.com/BelimbingApp/bilibi):**
 
@@ -134,14 +151,14 @@ Template updates are ordinary reviewed application changes; [Take template updat
 Your application has two remotes:
 
 - **`origin`**: your application repository, where you push and open pull requests.
-- **`upstream`**: this template, `https://github.com/BelimbingApp/bilibi-app.git`, where the wrapper, scripts, checks and this README come from.
+- **`upstream`**: this template, `https://github.com/BelimbingApp/bilibi-app-template.git`, where the wrapper, scripts, checks and this README come from.
 
 The checkouts in `sources/` have only `origin`: the URL saved in `setup.toml`, which `./bilibi` checks and `./bilibi pin` saves. Never repoint it. To propose a change to a component you cannot push to, add your fork as another remote, for example `fork`, and push your branch there.
 
 Once per clone, add the template and keep the GitHub CLI on your own repository:
 
 ```sh
-git remote add upstream https://github.com/BelimbingApp/bilibi-app.git
+git remote add upstream https://github.com/BelimbingApp/bilibi-app-template.git
 gh repo set-default YOUR-ORGANISATION/YOUR-APPLICATION
 ```
 
