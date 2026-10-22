@@ -448,17 +448,31 @@ def main():
     if (args.command == 'add') != (args.component is not None):
         parser.error('Use ./bilibi add <component> [--kind domains|extensions --source <url> --commit <sha>]; other commands take no arguments')
     if args.command in (None, 'help'):
-        print('This is a Bilibi application repository.\n\n'
+        print('This is a Bilibi application: your own product, built on Bilibi.\n'
+              'To change Bilibi itself, work in https://github.com/BelimbingApp/bilibi instead.\n\n'
               'Usage: ./bilibi <command>\n\n'
-              '  start          Prepare sources and start local development\n'
-              '  update         Pull the application and restore saved source commits\n'
-              '  add <id>       Mount an official Domain or Extension\n'
-              '  status         Show repositories, local changes and saved versions\n'
-              '  setup          Prepare sources, safeguards and prerequisites\n'
-              '  pin            Save validated component selections and dependencies\n'
-              '  check          Validate and test the saved composition\n'
-              '  build          Build the saved release composition\n'
-              '  help           Show this command list')
+              'Run your application on this computer\n'
+              '  start         Install anything missing, run the application, and open it\n'
+              '                in your browser.\n'
+              '  add <name>    Add a Domain or Extension, such as: ./bilibi add finance\n'
+              '                Or paste the add command that the Software page shows.\n'
+              '                Then run ./bilibi start again to use it.\n'
+              '  status        List the Platform, Domains and Extensions, with their branches,\n'
+              '                your uncommitted changes, and any difference from the saved versions.\n\n'
+              'Work with your team\n'
+              '  update        Get your team\'s latest pushed changes, and switch every source\n'
+              '                to the versions saved in setup.toml.\n'
+              '  pin           Save the versions you are running into setup.toml and\n'
+              '                composition/. Commit and push your source changes first,\n'
+              '                then commit those files here. Needs Docker.\n\n'
+              'Before a release\n'
+              '  check         Build and test the saved versions against an empty test\n'
+              '                database. Needs Docker.\n'
+              '  build         Build the release program from the saved versions. Needs Docker.\n'
+              '                README.md, Release your setup, explains how to publish a release.\n\n'
+              'Less often\n'
+              '  setup         Install the tools and fetch the sources, without starting.\n'
+              '  help          Show this list.')
         return
     if args.command == 'status':
         status()

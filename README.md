@@ -1,32 +1,79 @@
 # Bilibi application template
 
-This is the template for Bilibi applications. You don't work in it directly: `./bilibi new <name>` copies it, and the copy becomes your own application.
+Start here to build your own product on Bilibi. Clone this repository, run one command, and Bilibi opens in your browser. When it works for you, you make the copy your own and release it to your servers.
 
 > [!NOTE]
-> In your application, replace this introduction and **Which repository?** with your own. The sections from **Run an existing application** onward describe your application as they are.
+> In your application, replace everything above **Run an existing application** with your own introduction. The sections from there onward describe your application as they are.
+
+## Start here
+
+1. Clone the template into a folder named after your product, and start it:
+
+```sh
+git clone https://github.com/BelimbingApp/bilibi-app-template my-bilibi
+cd my-bilibi
+./bilibi start
+```
+
+The first start installs what is missing, such as Rust, PostgreSQL and Node, and builds Bilibi, so it takes a while. Then Bilibi opens in your browser at the sign-in page. Sign in as `ai@agent.my` / `bilibi-dev`. You now have the Platform on its own: sign-in, companies, people, users, permissions and audit.
+
+2. Add the business features you want. A Domain is one business area, such as Finance:
+
+```sh
+./bilibi add finance
+./bilibi start
+```
+
+The **Software** page in Bilibi lists what is available, and shows the exact `add` command for each one.
+
+3. Make it yours. Create an empty private repository on GitHub, for example `your-company/my-bilibi`, then run:
+
+```sh
+git remote rename origin upstream
+git remote add origin https://github.com/your-company/my-bilibi.git
+gh repo set-default your-company/my-bilibi
+git push -u origin main
+```
+
+Your folder now has two remotes. `origin` is your application, where you push. `upstream` is this template, so you can take its later improvements: see [Take template updates](#take-template-updates).
+
+> [!WARNING]
+> Clone the template as shown. Don't use GitHub's **Use this template** button: it creates a repository without the template's history, and template updates can then no longer merge.
+
+4. Save the versions you use, then release. When the Domains you added work, record their exact versions and commit them. This step needs Docker:
+
+```sh
+./bilibi pin
+git add setup.toml composition/
+git commit -m "Add Finance"
+git push
+```
+
+To install it on a server, follow [Release your setup](#release-your-setup) and [Install a release](#install-a-release).
+
+### Where do my changes go?
+
+| You changed… | Commit it in | Send it to |
+| --- | --- | --- |
+| Your application: its recipe, automation or docs | This folder | `origin`, your repository |
+| Bilibi itself | `sources/platform/` | A pull request to [`BelimbingApp/bilibi`](https://github.com/BelimbingApp/bilibi), pushed from your fork |
+| A Domain or Extension | Its folder under `sources/platform/apps/` | That component's own repository |
+
+In `sources/`, leave each folder's `origin` as it is: `./bilibi` checks it against `setup.toml`. To send a pull request to a repository you can't push to, add your fork as another remote, such as `fork`, and push there.
 
 ## Which repository?
 
-Bilibi has three kinds of repository. Most people start in `bilibi`, not here.
+Bilibi has three kinds of repository:
 
-| Repository | What it holds | Use it to |
+| Repository | What it holds | Start there to |
 | --- | --- | --- |
-| [`bilibi`](https://github.com/BelimbingApp/bilibi) | The Platform's source code | Try Bilibi, change the Platform, and add Domains and Extensions to develop or test them |
-| `bilibi-app-template` (this one) | The template for applications | Change what every new application starts with. Most people never work in it. |
-| Your application, such as `your-company/my-bilibi` | One product: the Platform, Domain and Extension versions it uses | Develop your product, build releases, and install them on your servers |
+| `bilibi-app-template` (this one) | The template every application is copied from | Build your own product |
+| [`bilibi`](https://github.com/BelimbingApp/bilibi) | Bilibi's source code: the Platform | Change Bilibi itself, or build a Domain or Extension for everyone |
+| Your application, such as `your-company/my-bilibi` | One product: the Bilibi, Domain and Extension versions it uses, and its releases | Work on your product, once you have made it |
 
-For example, you try Bilibi in a `bilibi` clone and add the Finance Domain. When you want to keep that setup as your own product, you run `./bilibi new my-bilibi` there. It copies this template into a new `my-bilibi` folder and records the Platform and Finance versions in it. From then on, you develop and release from `my-bilibi`.
+A template is a ready-made starting copy. You don't work in it; you copy it and change the copy. Your copy keeps the template's working parts as they are, such as the `./bilibi` commands, the checks and the release scripts. You replace its sample parts with your own, such as the `YOUR-ORGANISATION` names in this README.
 
-A template is a ready-made starting copy. You don't work in it; you copy it and change the copy. Your copy keeps the template's working parts as they are, such as the `./bilibi` commands, the checks and the release scripts. You replace its sample parts with your own, such as the example recipe in `setup.toml` and the `YOUR-ORGANISATION` names in this README. When the template improves later, you can merge its changes into your copy: see [Take template updates](#take-template-updates).
-
-**New to Bilibi? Start in [bilibi](https://github.com/BelimbingApp/bilibi):**
-
-```sh
-git clone https://github.com/BelimbingApp/bilibi
-cd bilibi && ./bilibi start
-```
-
-You can try Bilibi without creating a GitHub account or choosing a template. Later, `./bilibi new <name>` in that Platform clone creates your application repository.
+If you started in `bilibi` instead, `./bilibi new <name>` there turns what you built into an application like this one.
 
 ## Run an existing application
 
@@ -36,7 +83,7 @@ Clone your application's repository, then run:
 ./bilibi start
 ```
 
-The same command works with or without an AI agent. It obtains missing sources, installs commit safeguards, prepares missing prerequisites, and starts the existing development launcher. The launcher prints the address and development sign-in (`ai@agent.my` / `bilibi-dev`). Local HTTPS may need manual trust; the launcher keeps its loopback HTTP fallback.
+The same command works with or without an AI agent. It obtains missing sources, installs commit safeguards, prepares missing prerequisites, and starts the existing development launcher. Bilibi opens in your browser at the sign-in page when it is ready; sign in as `ai@agent.my` / `bilibi-dev`. If no browser opens, open the address the launcher prints. Set `BILIBI_OPEN_BROWSER=0` to stop it opening. Local HTTPS may need manual trust; the launcher keeps its loopback HTTP fallback.
 
 Use apt-based Ubuntu or Debian, including WSL2, with Git, Bash, Python 3.11 or newer, network access and installation privileges. Setup may ask for your sudo password. Ubuntu 22.04 and Debian 11 ship older Python; install Python 3.11 or newer as `python3`, or use Ubuntu 24.04 or Debian 12. Setup prepares Rust, Node, PostgreSQL 18 and cargo-watch through the Platform's existing scripts. Release commands also need Docker with a running daemon and the pinned builder described below.
 
@@ -74,18 +121,19 @@ The Platform keeps its existing runtime locations: `.local/dev` contains develop
 
 ## Commands
 
-| Command | What it does |
-| --- | --- |
-| `./bilibi help` | List the commands. Running `./bilibi` without a command shows the same list. |
-| `./bilibi start` | Obtain missing sources, prepare prerequisites and start local development with the development seed. |
-| `./bilibi update` | Pull the application with a fast-forward, restore the saved component commits and regenerate composition files. |
-| `./bilibi setup` | Prepare missing sources, safeguards and prerequisites; preserve existing branches, staged files, edits and untracked files. |
-| `./bilibi add finance` | Install the Platform safeguard, then mount an official Domain or Extension from its catalogue. Existing destinations are preserved. |
-| `./bilibi add <id> --kind <domains\|extensions> --source <repository> --commit <commit>` | Mount the official repository at the exact commit shown by Software, even when the local catalogue does not list it. |
-| `./bilibi status` | Show application and component Git roots, branches, changes and saved-version differences. |
-| `./bilibi pin` | Record committed component selections and resolved dependencies after validating a disposable candidate. |
-| `./bilibi check` | Validate the saved commits and lock, format, lint, build, migrate, seed and boot against a separate empty database. |
-| `./bilibi build` | Use the pinned builder to compile and verify the saved release composition with `--locked`. |
+Run commands from the application's root folder. `./bilibi help` shows the same list. Your branches, staged files and uncommitted edits are always kept.
+
+| Command | What it does | When to use it |
+| --- | --- | --- |
+| `./bilibi start` | Installs anything missing, fetches the sources, runs the application, and opens it in your browser | Every time you want to run your application |
+| `./bilibi add <name>` | Adds a Domain or Extension, such as `finance`. You can also paste the `add` command that the Software page shows. | When you want a new business feature. Run `start` again afterwards. |
+| `./bilibi status` | Lists the Platform, Domains and Extensions, with their branches, your uncommitted changes, and any difference from the saved versions | When you want to see what you have changed |
+| `./bilibi update` | Gets your team's latest pushed changes, and switches every source to the versions saved in `setup.toml` | Before you start work, to match your team |
+| `./bilibi pin` | Saves the versions you are running into `setup.toml` and `composition/`. Commit and push your source changes first. Needs Docker. | After you add a Domain, or change a source, and it works |
+| `./bilibi check` | Builds and tests the saved versions against an empty test database. Needs Docker. | Before a release, or to check a pin |
+| `./bilibi build` | Builds the release program from the saved versions. Needs Docker. | When you make a release; see [Release your setup](#release-your-setup) |
+| `./bilibi setup` | Installs the tools and fetches the sources, without starting | When you want everything ready in advance |
+| `./bilibi help` | Shows the command list | Any time |
 
 `./bilibi new` belongs to the Platform repository. In an application repository, you already own the application recipe.
 

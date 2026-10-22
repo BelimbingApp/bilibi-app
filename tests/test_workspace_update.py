@@ -245,7 +245,8 @@ class UpdateTest(unittest.TestCase):
     def test_help_and_no_command_are_plain_and_do_not_need_a_recipe(self):
         (self.app / 'setup.toml').unlink()
         output = self.command('help')
-        self.assertTrue(output.startswith('This is a Bilibi application repository.\n\nUsage: ./bilibi <command>\n'))
+        self.assertTrue(output.startswith('This is a Bilibi application: your own product, built on Bilibi.\n'))
+        self.assertIn('Usage: ./bilibi <command>\n', output)
         self.assertIn('  update ', output)
         self.assertEqual(output, self.command())
         self.assertIn('usage: ./bilibi', self.command('-h'))
