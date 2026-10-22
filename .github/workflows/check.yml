@@ -11,6 +11,8 @@ on:
     secrets:
       SOURCE_READ_TOKEN:
         required: false
+      SOURCE_APP_PRIVATE_KEY:
+        required: false
 permissions:
   contents: read
 jobs:
@@ -36,10 +38,24 @@ jobs:
           fetch-depth: 0
       - name: Test publisher helpers
         run: python3 -m unittest discover -s tests
+      # Preferred over the SOURCE_READ_TOKEN secret: a GitHub App installed only
+      # on the private source repositories mints a read-only token that expires
+      # within the hour and is revoked when the job ends.
+      - name: Mint a source read token from the GitHub App
+        id: source-app
+        if: vars.SOURCE_APP_CLIENT_ID != '' && (github.event_name != 'pull_request' || (vars.SOURCE_READ_ON_PULL_REQUESTS == 'true' && github.event.pull_request.head.repo.full_name == github.repository))
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.SOURCE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SOURCE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: read
       - name: Materialize exact sources
         env:
-          # Pull requests, including same-repository requests, receive no source secret.
-          SOURCE_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.SOURCE_READ_TOKEN || '' }}
+          # Pull requests receive no source secret, unless the repository sets
+          # SOURCE_READ_ON_PULL_REQUESTS to true; then pull requests from its own
+          # branches do. Pull requests from forks never do.
+          SOURCE_READ_TOKEN: ${{ (github.event_name != 'pull_request' || (vars.SOURCE_READ_ON_PULL_REQUESTS == 'true' && github.event.pull_request.head.repo.full_name == github.repository)) && (steps.source-app.outputs.token || secrets.SOURCE_READ_TOKEN) || '' }}
           GIT_TERMINAL_PROMPT: '0'
         run: |
           GIT_ASKPASS="$PWD/scripts/source-askpass.sh" python3 scripts/recipe.py materialize
