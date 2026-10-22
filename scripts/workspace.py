@@ -448,7 +448,8 @@ def main():
     if (args.command == 'add') != (args.component is not None):
         parser.error('Use ./bilibi add <component> [--kind domains|extensions --source <url> --commit <sha>]; other commands take no arguments')
     if args.command in (None, 'help'):
-        print('Usage: ./bilibi <command>\n\n'
+        print('This is a Bilibi application repository.\n\n'
+              'Usage: ./bilibi <command>\n\n'
               '  start          Prepare sources and start local development\n'
               '  update         Pull the application and restore saved source commits\n'
               '  add <id>       Mount an official Domain or Extension\n'
