@@ -127,7 +127,45 @@ Create a separate application clone with the updated template commands and your 
 
 To adopt a clean existing clone manually, stop only that workspace's own processes by PID, verify the resolved source and destination paths, and move `build/platform` to an absent `sources/platform` on the same filesystem. Preserve its `.git`, nested component repositories, local files and runtime data together. Inspect an existing `target/` directory and deliberately move its outputs into `build/target` before setup creates its output link. Run status and setup, then validate with disposable data before changing editor or service paths. Roll back by restoring those recorded paths and the old application checkout; retain its database and keys.
 
-Template updates are ordinary reviewed application changes: bring in the new wrapper, scripts and documentation on a branch while preserving your `setup.toml`, saved composition and application-specific automation. Resolve changes and run the saved-composition checks before merging. After those changes reach your application's remote branch, `./bilibi update` pulls them into a clean workspace. It does not import changes directly from the template repository.
+Template updates are ordinary reviewed application changes; [Take template updates](#take-template-updates) shows how. After those changes reach your application's remote branch, `./bilibi update` pulls them into a clean workspace. It does not import changes directly from the template repository.
+
+## Take template updates
+
+Your application has two remotes:
+
+- **`origin`**: your application repository, where you push and open pull requests.
+- **`upstream`**: this template, `https://github.com/BelimbingApp/bilibi-app.git`, where the wrapper, scripts, checks and this README come from.
+
+The checkouts in `sources/` have only `origin`: the URL saved in `setup.toml`, which `./bilibi` checks and `./bilibi pin` saves. Never repoint it. To propose a change to a component you cannot push to, add your fork as another remote, for example `fork`, and push your branch there.
+
+Once per clone, add the template and keep the GitHub CLI on your own repository:
+
+```sh
+git remote add upstream https://github.com/BelimbingApp/bilibi-app.git
+gh repo set-default YOUR-ORGANISATION/YOUR-APPLICATION
+```
+
+Without the second line, the GitHub CLI sends `gh pr create` and other commands to the template, because it prefers a remote named `upstream`.
+
+To take the template's changes, merge them on a branch and open a pull request:
+
+```sh
+git switch -c template-sync main
+git fetch upstream
+git merge upstream/main
+git push -u origin template-sync
+gh pr create --fill
+```
+
+Git keeps your own changes and brings in only what the template changed since the last merge. It stops on a conflict only where both sides changed the same lines; fix those, then `git commit`. Use `git merge`, not `git pull` or a rebase, which would rewrite your history onto the template's. **Merge that pull request with a merge commit, not a squash**: a squash drops the link to the template, and the next merge brings the same changes in again.
+
+**If your history is not linked to the template yet**, `git merge upstream/main` refuses with "refusing to merge unrelated histories". First bring your files level with a template commit by hand, keeping your own changes. Then record that commit as merged without changing any file, and merge that pull request with a merge commit too:
+
+```sh
+git merge --allow-unrelated-histories -s ours <template-commit>
+```
+
+Only record a commit whose changes you have really taken: Git will never offer them again.
 
 ## Release your setup
 
