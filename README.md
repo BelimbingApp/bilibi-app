@@ -1,16 +1,16 @@
-# Bilibi application template
+# Bilibi app maker
 
-Start here to build your own product on Bilibi. Clone this repository, run one command, and Bilibi opens in your browser. When it works for you, you make the copy your own and release it to your servers.
+Start here to make your own product on Bilibi. Clone this repository, run one command, and Bilibi opens in your browser. When it works for you, you make the copy your own and release it to your servers.
 
 > [!NOTE]
 > In your application, replace everything above **Run an existing application** with your own introduction. The sections from there onward describe your application as they are.
 
 ## Start here
 
-1. Clone the template into a folder named after your product, and start it:
+1. Clone the maker into a folder named after your product, and start it:
 
 ```sh
-git clone https://github.com/BelimbingApp/bilibi-app-template my-bilibi
+git clone https://github.com/BelimbingApp/bilibi-app-maker my-bilibi
 cd my-bilibi
 ./bilibi start
 ```
@@ -35,10 +35,10 @@ gh repo set-default your-company/my-bilibi
 git push -u origin main
 ```
 
-Your folder now has two remotes. `origin` is your application, where you push. `upstream` is this template, so you can take its later improvements: see [Take template updates](#take-template-updates).
+Your folder now has two remotes. `origin` is your application, where you push. `upstream` is the maker, so you can take its later improvements: see [Take maker updates](#take-maker-updates).
 
 > [!WARNING]
-> Clone the template as shown. Don't use GitHub's **Use this template** button: it creates a repository without the template's history, and template updates can then no longer merge.
+> Clone the maker as shown. A copy made any other way, such as a downloaded ZIP file, has none of the maker's history, and maker updates can then no longer merge.
 
 4. Save the versions you use, then release. When the Domains you added work, record their exact versions and commit them. This step needs Docker:
 
@@ -67,13 +67,25 @@ Bilibi has three kinds of repository:
 
 | Repository | What it holds | Start there to |
 | --- | --- | --- |
-| `bilibi-app-template` (this one) | The template every application is copied from | Build your own product |
+| `bilibi-app-maker` (this one) | Where every application starts: its starting files and the `./bilibi` commands | Make your own product |
 | [`bilibi`](https://github.com/BelimbingApp/bilibi) | Bilibi's source code: the Platform | Change Bilibi itself, or build a Domain or Extension for everyone |
 | Your application, such as `your-company/my-bilibi` | One product: the Bilibi, Domain and Extension versions it uses, and its releases | Work on your product, once you have made it |
 
-A template is a ready-made starting copy. You don't work in it; you copy it and change the copy. Your copy keeps the template's working parts as they are, such as the `./bilibi` commands, the checks and the release scripts. You replace its sample parts with your own, such as the `YOUR-ORGANISATION` names in this README.
+You clone the maker, and your clone becomes your application. It keeps the maker's working parts as they are, such as the `./bilibi` commands, the checks and the release scripts. You replace its sample parts with your own, such as the `YOUR-ORGANISATION` names in this README. When the maker improves, you merge its changes into your application: see [Take maker updates](#take-maker-updates).
 
 If you started in `bilibi` instead, `./bilibi new <name>` there turns what you built into an application like this one.
+
+## What the maker will do
+
+Today the maker gives you a running Bilibi and the commands to build, check and release it. Some steps are still manual, such as making the clone your own or connecting private Domains. The maker will take these over, one command each:
+
+| Step | Today | Planned |
+| --- | --- | --- |
+| Choose business features | `./bilibi add <name>`, if you know the name | Pick from a list ([#11](https://github.com/BelimbingApp/bilibi-app-maker/issues/11)) |
+| Make it yours | Four Git commands, in [Start here](#start-here) | `./bilibi own <owner/name>` ([#12](https://github.com/BelimbingApp/bilibi-app-maker/issues/12)) |
+| Use private Domains | Set up a GitHub App by hand, in [Private sources](#private-sources) | One command ([#13](https://github.com/BelimbingApp/bilibi-app-maker/issues/13)) |
+| Release and install | Several steps, in [Release your setup](#release-your-setup) | `./bilibi release` ([#14](https://github.com/BelimbingApp/bilibi-app-maker/issues/14)) |
+| Stay current | Merge maker updates and move the Platform, separately | `./bilibi upgrade` ([#15](https://github.com/BelimbingApp/bilibi-app-maker/issues/15)) |
 
 ## Run an existing application
 
@@ -188,46 +200,46 @@ An existing executable pre-commit hook is preserved as `pre-commit.before-bilibi
 
 Keep the old checkout and runtime data until a parallel workspace has been used successfully. First record the old paths, remotes, branches, commits, staged and unstaged changes, untracked files, configuration and active processes. Inspect keys and database locations without printing secrets.
 
-Create a separate application clone with the updated template commands and your reviewed recipe and composition. Run setup there. Validate with a separate database and local data paths. Transfer or commit source edits deliberately in their owning repositories; setup does not migrate the old `build/platform` clone. Do not delete the old `build/`: older layouts keep valuable sources there.
+Create a separate application clone with the updated maker commands and your reviewed recipe and composition. Run setup there. Validate with a separate database and local data paths. Transfer or commit source edits deliberately in their owning repositories; setup does not migrate the old `build/platform` clone. Do not delete the old `build/`: older layouts keep valuable sources there.
 
 To adopt a clean existing clone manually, stop only that workspace's own processes by PID, verify the resolved source and destination paths, and move `build/platform` to an absent `sources/platform` on the same filesystem. Preserve its `.git`, nested component repositories, local files and runtime data together. Inspect an existing `target/` directory and deliberately move its outputs into `build/target` before setup creates its output link. Run status and setup, then validate with disposable data before changing editor or service paths. Roll back by restoring those recorded paths and the old application checkout; retain its database and keys.
 
-Template updates are ordinary reviewed application changes; [Take template updates](#take-template-updates) shows how. After those changes reach your application's remote branch, `./bilibi update` pulls them into a clean workspace. It does not import changes directly from the template repository.
+Maker updates are ordinary reviewed application changes; [Take maker updates](#take-maker-updates) shows how. After those changes reach your application's remote branch, `./bilibi update` pulls them into a clean workspace. It does not import changes directly from the maker repository.
 
-## Take template updates
+## Take maker updates
 
 Your application has two remotes:
 
 - **`origin`**: your application repository, where you push and open pull requests.
-- **`upstream`**: this template, `https://github.com/BelimbingApp/bilibi-app-template.git`, where the wrapper, scripts, checks and this README come from.
+- **`upstream`**: the maker, `https://github.com/BelimbingApp/bilibi-app-maker.git`, where the wrapper, scripts, checks and this README come from.
 
 The checkouts in `sources/` have only `origin`: the URL saved in `setup.toml`, which `./bilibi` checks and `./bilibi pin` saves. Never repoint it. To propose a change to a component you cannot push to, add your fork as another remote, for example `fork`, and push your branch there.
 
-Once per clone, add the template and keep the GitHub CLI on your own repository:
+Once per clone, add the maker and keep the GitHub CLI on your own repository:
 
 ```sh
-git remote add upstream https://github.com/BelimbingApp/bilibi-app-template.git
+git remote add upstream https://github.com/BelimbingApp/bilibi-app-maker.git
 gh repo set-default YOUR-ORGANISATION/YOUR-APPLICATION
 ```
 
-Without the second line, the GitHub CLI sends `gh pr create` and other commands to the template, because it prefers a remote named `upstream`.
+Without the second line, the GitHub CLI sends `gh pr create` and other commands to the maker, because it prefers a remote named `upstream`.
 
-To take the template's changes, merge them on a branch and open a pull request:
+To take the maker's changes, merge them on a branch and open a pull request:
 
 ```sh
-git switch -c template-sync main
+git switch -c maker-sync main
 git fetch upstream
 git merge upstream/main
-git push -u origin template-sync
+git push -u origin maker-sync
 gh pr create --fill
 ```
 
-Git keeps your own changes and brings in only what the template changed since the last merge. It stops on a conflict only where both sides changed the same lines; fix those, then `git commit`. Use `git merge`, not `git pull` or a rebase, which would rewrite your history onto the template's. **Merge that pull request with a merge commit, not a squash**: a squash drops the link to the template, and the next merge brings the same changes in again.
+Git keeps your own changes and brings in only what the maker changed since the last merge. It stops on a conflict only where both sides changed the same lines; fix those, then `git commit`. Use `git merge`, not `git pull` or a rebase, which would rewrite your history onto the maker's. **Merge that pull request with a merge commit, not a squash**: a squash drops the link to the maker, and the next merge brings the same changes in again.
 
-**If your history is not linked to the template yet**, `git merge upstream/main` refuses with "refusing to merge unrelated histories". First bring your files level with a template commit by hand, keeping your own changes. Then record that commit as merged without changing any file, and merge that pull request with a merge commit too:
+**If your history is not linked to the maker yet**, `git merge upstream/main` refuses with "refusing to merge unrelated histories". First bring your files level with a maker commit by hand, keeping your own changes. Then record that commit as merged without changing any file, and merge that pull request with a merge commit too:
 
 ```sh
-git merge --allow-unrelated-histories -s ours <template-commit>
+git merge --allow-unrelated-histories -s ours <maker-commit>
 ```
 
 Only record a commit whose changes you have really taken: Git will never offer them again.
@@ -312,7 +324,7 @@ For local private-source access, use your own Git credential helper or `GIT_ASKP
 
 ## Build requirements
 
-Only Linux x86-64 (`x86_64-unknown-linux-gnu`) is supported by this template today. `rust-toolchain.toml` pins Rust 1.99.0. `builder.toml` pins the Rust and Node image digests, Node 24.6.0, PostgreSQL 18.0, the Debian package snapshot and the runner label. The Dockerfile uses that dated snapshot for Python and records installed packages.
+Only Linux x86-64 (`x86_64-unknown-linux-gnu`) is supported by this maker today. `rust-toolchain.toml` pins Rust 1.99.0. `builder.toml` pins the Rust and Node image digests, Node 24.6.0, PostgreSQL 18.0, the Debian package snapshot and the runner label. The Dockerfile uses that dated snapshot for Python and records installed packages.
 
 The Debian 12 builder records its glibc version and the binary's dynamic dependencies in the recipe. This is a build baseline, not a claim that every Debian or Ubuntu release has been tested. Check the actual target server's libraries before promotion. Distributed programs do not use `target-cpu=native`.
 
