@@ -1,8 +1,6 @@
 # Written by scripts/discover-modules.py --pin; read by --restore and apps/web/build.rs.
-platform = "2f7078b669ef38e59802b1f2c0355a98ea01e732"
+platform = "14a237ad37625b6c6b38738e33624833caa0d140"
 platform_version = "0.1.1"
-cargo_lock_sha256 = "3cf9e95ee30d6618dd8db71c27947169786a6e99df34d8295231fde9d8b20a26"
+cargo_lock_sha256 = "68576f9ed158ee5dcbbd5d08ba8c445efa7f4269fd26a8c724b1ab6499e2532e"
 
-[containers."domains/finance"]
-head = "24938fb69a4da94275ae74085ec03671a8efd51e"
-version = "0.1.0"
+[containers]
